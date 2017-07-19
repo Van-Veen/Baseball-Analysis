@@ -5,21 +5,34 @@ library(data.table)
 library(magrittr)
 library(lubridate)
 
-# Root File ::------------------------------------
-fp <- "/Users/joelstewart/Desktop/Baseball Analysis/Data/"
 
 # Functions ::-----------------------------------
-getPlayer <- function(playerName){
-  DF <- fread("/Users/joelstewart/Desktop/Baseball Analysis/Data/Master.csv") %>% 
+tableLoader <- function(tableName, atWork = T){
+  
+  fp <- "/Users/joelstewart/Desktop/Baseball Analysis/Data/"
+  fpw <- "C:/Users/jstewart/Desktop/Baseball Analysis/Data/"
+  
+  if(atWork == T){
+    DF <- fread(paste(fpw, tableName, ".csv", sep = ""))
+  }else{
+    DF <- fread(paste(fp, tableName, ".csv", sep = ""))
+  }
+  
+  return(DF)
+}
+
+getPlayer <- function(playerName, atWork = F){
+  DF <- tableLoader("Master", atWork = atWork) %>% 
     .[, fullName := paste(nameFirst, nameLast, sep = " ")] %>% 
     .[fullName == playerName]
   
   return(DF)
 }
 
-batting <- function(playerName){
-  x <- getPlayer(playerName)$playerID
-  DF <- fread("/Users/joelstewart/Desktop/Baseball Analysis/Data/Batting.csv") %>% 
+batting <- function(playerName, atWork = F){
+  x <- getPlayer(playerName, atWork = atWork)$playerID
+  
+  DF <- tableLoader("Batting", atWork = atWork) %>% 
     .[playerID == x]
   
   return(DF)
