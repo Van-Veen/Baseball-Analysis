@@ -24,17 +24,20 @@ tableLoader <- function(tableName, atWork = T){
 getPlayer <- function(playerName, atWork = F){
   DF <- tableLoader("Master", atWork = atWork) %>% 
     .[, fullName := paste(nameFirst, nameLast, sep = " ")] %>% 
-    .[fullName == playerName]
+    .[fullName == playerName] %>% 
+    .[, age_CF := ifelse(birthMonth > 6, 1, 0)]
   
   return(DF)
 }
 
 batting <- function(playerName, atWork = F){
-  x <- getPlayer(playerName, atWork = atWork)$playerID
+  player <- getPlayer(playerName, atWork = atWork)$playerID
+  birthYear <- getPlayer(playerName, atWork = atWork)[, birthYear + age_CF]
   
   DF <- tableLoader("Batting", atWork = atWork) %>% 
-    .[playerID == x] %>% 
+    .[playerID == player] %>% 
     setnames(., c("2B", "3B"), c("B2", "B3")) %>% 
+    .[, Age := yearID - birthYear] %>% 
     .[, BA := round(H/AB, 3)] %>% 
     .[, PA := AB + BB + HBP + SF + SH, by = c("yearID", "teamID")] %>% 
     .[, OBP := round((H + BB + HBP)/(AB + BB + HBP + SF), 3)] %>% 
