@@ -48,4 +48,28 @@ batting <- function(playerName, atWork = F){
   return(DF)
 }
 
+advBatting <- function(playerName, atWork = F){
+  player <- getPlayer(playerName, atWork = atWork)$playerID
+  birthYear <- getPlayer(playerName, atWork = atWork)[, birthYear + age_CF]
+  
+  DF <- tableLoader("Batting", atWork = atWork) %>% 
+    .[playerID == player] %>% 
+    setnames(., c("2B", "3B"), c("B2", "B3")) %>% 
+    .[, Age := yearID - birthYear] %>%
+    .[, PA := AB + BB + HBP + SF + SH, by = c("yearID", "teamID")] %>% 
+    .[, BBp := round((BB)/PA * 100, 1), by = c("yearID", "teamID")] %>% 
+    .[, Kp := round(SO/PA * 100, 1), by = c("yearID", "teamID")] %>% 
+    .[, BBK := ifelse(Kp > 0, round(BB/SO, 2), 0.00)] %>% 
+    .[, BA := round(H/AB, 3)] %>% 
+    .[, OBP := round((H + BB + HBP)/(AB + BB + HBP + SF), 3)] %>% 
+    .[, SLG := round((((H - B2 - B3 - HR) + (B2*2) + (B3 * 3) + (HR * 4))/AB), 3)] %>% 
+    .[, OPS := OBP + SLG] %>% 
+    .[, ISO := SLG - BA] %>% 
+    .[, BABIP := round((H - HR)/(AB - SO - HR + SF), 3)] %>% 
+    .[, c("playerID", "yearID", "stint", "teamID", "lgID", "Age", "BBp", "Kp", "BBK", "BA",
+          "OBP", "SLG", "OPS", "ISO", "BABIP"), with = F]
+  
+  return(DF)
+    
+}
 
