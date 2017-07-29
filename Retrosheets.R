@@ -7,12 +7,12 @@ fp <- "/Users/joelstewart/Desktop/Baseball Analysis/Data/2016eve/2016LAN.EVN"
 
 playCols <- c("Idx", "Category", "Inning", "HomeTeam", "RetroID", "Count", "Results", "Play" )
 
-DF <- readLines(fpw) %>% 
+DF <- readLines(fp) %>% 
   .[-grep("version,", .)] %>% 
   paste(seq(1, length(.), by = 1), ., sep = ",") 
 
 
-PLAYS <- readLines(fpw) %>% 
+PLAYS <- readLines(fp) %>% 
   .[-grep("version,", .)] %>% 
   paste(seq(1, length(.), by = 1), ., sep = ",") %>% 
   .[grep("play,", .)] %>% 
@@ -125,7 +125,7 @@ RSprep <- function(){
   
   playCols <- c("Idx", "Category", "Inning", "HomeTeam", "RetroID", "Count", "Results", "Play" )
   
-  DF <- readLines(fpw) %>% 
+  DF <- readLines(fp) %>% 
     .[-grep("version,", .)] %>% 
     paste(seq(1, length(.), by = 1), ., sep = ",") 
   
@@ -148,9 +148,10 @@ RSprep <- function(){
   
   maxCol <- PR[, max(nchar(Results))]
   
-  write.table(PR$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+  #write.table(PR$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+  write.table(PR$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
   
-  PRP <- read.csv("C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv",
+  PRP <- read.csv("/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv",
                   col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
                   fill = T, header = F) %>% 
     data.table(.) %>% 
@@ -215,9 +216,9 @@ test2 <- test[Idx %in% c(46:49)] %>%
 test3 <- RSprep() %>% 
   .[, cnt := countMaker(value), by = Idx] %>% 
   .[, variable := gsub("P", "", variable)] %>% 
-  .[, variable := as.integer(variable)] %>% 
-  .[, mv :=  max(variable), by = Idx] %>% 
-  .[variable == mv]
+  .[, variable := as.integer(variable)] #%>% 
+  #.[, mv :=  max(variable), by = Idx] %>% 
+  #.[variable == mv]
 
 
 
@@ -229,4 +230,39 @@ test3 <- RSprep() %>%
 
 
 WPs <- PLAYS[grep("WP", Play)]$Idx
-PLAYS[Idx %in% c(WPs, WPs + 1)] %>% head(., 51)
+PLAYS[Idx %in% c(WPs, WPs + 1)] %>% .[order(Idx)] %>%  head(., 51)
+
+NPs <- PLAYS[grep("\\.", Results)]$Idx
+PLAYS[Idx %in% c(WPs, WPs + 1) == F,] %>% .[Idx %in% c(NPs, NPs - 1)] %>% .[order(Idx)] %>% head(.)
+
+test4 <- PLAYS[Idx %in% c(46:55)]
+
+iterationCount <- function(x){
+  
+  previousName <- x[1]
+  iterative <- c(1, rep(0, length(x) - 1))
+  counter <- 1
+  
+  for(i in 2:length(x)){
+    if(x[i] == previousName){
+      counter <- counter + 1
+      iterative[i] <- counter
+      previousName <- x[i]
+    }else{
+      iterative[i] <- 1
+      previousName <- x[i]
+      counter <- 1
+    }
+  }
+  
+  return(iterative)
+}
+
+
+PLAYS <- PLAYS[, batterRep := iterationCount(RetroID)]
+
+# List of items that constitue what I'm calling a New Line Play, where a play occurs
+# WP: Wild Pitch
+
+
+
