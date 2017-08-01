@@ -38,35 +38,31 @@ batting_avg <- function(playerName, atWork = F, agg = NULL){
 
 slashLine <- function(playerName, atWork = F, agg = NULL){
   
-  t1 <- batting(playerName, atWork = atWork) %>% 
-    .[, c("playerID", "yearID", "teamID", "lgID", "Age", "BA", "OBP", "SLG"), with = F] %>% 
-    .[, BAm := round(mean(BA), 3), by = agg] %>% 
-    .[, OBPm := round(mean(OBP), 3), by = agg] %>% 
-    .[, SLGm := round(mean(SLG), 3), by = agg]
+  t1 <- batting(playerName, atWork = atWork) 
   
   if(is.null(agg)){
     
-    t1 <- t1[, -c("BA", "OBP", "SLG"), with = F] %>% 
-      .[yearID == max(yearID)] %>% 
-      .[, slashLine := paste(BAm, OBPm, SLGm, sep = "/")] %>% 
-      .[, c("playerID", "slashLine"), with = F]
+    t1 <- t1[, BA := round(sum(H)/sum(AB), 3)] %>% 
+      .[, OBP := round(sum(H, BB, HBP)/sum(AB, BB, HBP, SF), 3)] %>% 
+      .[, SLG := round((((sum(H) - sum(B2) - sum(B3) - sum(HR)) + (sum(B2) * 2) + (sum(B3) * 3) + (sum(HR) * 4))/sum(AB)), 3)] %>% 
+      .[, c("playerID", "BA", "OBP", "SLG"), with = F] %>% 
+      .[, slashLine := paste(BA, OBP, SLG, sep = "/")] %>% 
+      .[, c("playerID", "slashLine"), with = F] %>% 
+      unique(.)
     
   }else{
     
-    t1 <- t1[, c("playerID", agg, "BAm", "OBPm", "SLGm"), with = F] %>% 
-      .[, slashLine := paste(BAm, OBPm, SLGm, sep = "/")] %>% 
-      .[, -c("OBPm", "BAm", "SLGm"), with = F]
+    t1 <- t1[, BA := round(sum(H)/sum(AB), 3), by = agg] %>% 
+      .[, OBP := round(sum(H, BB, HBP)/sum(AB, BB, HBP, SF), 3), by = agg] %>% 
+      .[, SLG := round((((sum(H) - sum(B2) - sum(B3) - sum(HR)) + (sum(B2) * 2) + (sum(B3) * 3) + (sum(HR) * 4))/sum(AB)), 3), by = agg] %>% 
+      .[, slashLine := paste(BA, OBP, SLG, sep = "/")] %>% 
+      .[, c("playerID", agg, "slashLine"), with = F] %>% 
+      unique(.)
     
-    if(agg == "teamID"){
-      
-      t1 <- unique(t1)
       
     }
-    
-  }
   
   return(t1)
   
 }
-
 
