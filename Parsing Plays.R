@@ -405,10 +405,66 @@ STARTS <- STARTS[, P11 := rep(NA, nrow(STARTS))] %>%
   .[, P12 := rep(NA, nrow(.))] %>% 
   .[, Sub := rep(0, nrow(.))] %>% 
   .[, c(names(SUB)), with = F] %>% 
-  .[, Home := as.numeric(Home)]
+  .[, Home := as.numeric(Home)] %>% 
+  .[, c(-1), with = F]
 
 test <- PLAYS[, Home := ifelse(HomeTeam == 0, 1, 0)] %>% 
-  merge(., STARTS, by = c("Date", "Home"), all.x = T)
+  merge(., STARTS, by = c("Date", "Home"), all.x = T) %>% 
+  .[order(Idx)]
 
+# This process layers in the players and their respective positions relative to each pitch and play result at the moment. Now we need to figure out how to
+# incorporate player substitutions
+
+newSubCols <- c("PlayCount", "Category", "Inning", "HomeTeam", "RetroID", "PitchCount", "Result", "Play", "homeLab", "visLab")
+
+SUB <- SUB[, (newSubCols) := rep(NA, nrow(SUB))] %>% 
+  .[, c(names(test)), with = F]
+
+test2 <- rbind(test, SUB) %>% 
+  .[order(Idx)]
+
+
+
+subFiller <- function(df, px){
+  
+  crossWalk <- df[Sub == 1 & !is.na(px), c("Idx", px, "Home", "Date"), with = F] %>% na.omit(.) %>% 
+    data.frame(.)
+  
+  for(i in 1:nrow(crossWalk)){
+    
+    if(i != nrow(crossWalk)){
+      
+      df[Idx >= crossWalk$Idx[i] & Idx <= crossWalk$Idx[i + 1] & Home == crossWalk$Home[i] & Date == crossWalk$Date[i], c(px) := crossWalk[i, 2]]
+      
+    }else{
+      
+      df[Idx >= crossWalk$Idx[i] & Idx <= max(df$Idx) & Home == crossWalk$Home[i] & Date == crossWalk$Date[i], c(px) := crossWalk[i, 2]]
+      
+    }
+    
+  }
+  
+  return(df)
+  
+}
+
+
+test2 <- subFiller(test2, "P1")
+test2 <- subFiller(test2, "P2")
+test2 <- subFiller(test2, "P3")
+test2 <- subFiller(test2, "P4")
+test2 <- subFiller(test2, "P5")
+test2 <- subFiller(test2, "P6")
+test2 <- subFiller(test2, "P7")
+test2 <- subFiller(test2, "P8")
+test2 <- subFiller(test2, "P9")
+
+test2 <- test2[!is.na(RetroID)]
+
+
+test2[Date == "2016-04-12", table(Inning, P1)]
+
+# It doesn't look like this is working right, cause looking at the game above it looks like Maeda was subbed back into the game for the 9th inning. I 
+# confirmed this as incorrect by loooking back at the SUB file...
 
 
