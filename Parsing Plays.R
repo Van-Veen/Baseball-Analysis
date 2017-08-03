@@ -385,9 +385,9 @@ minDateStart <- POS[, Idx := as.numeric(Idx)] %>%
   .[, Date := na.locf(Date)] %>% 
   .[!is.na(RetroID)] %>% 
   .[Category == "start"] %>% 
-  .[, list("Idx" = min(Idx)), by = Date]
+  .[, list("Idx" = min(Idx)), by = c("Date", "Home")]
 
-STARTS <- merge(STARTS, minDateStart, by = "Date", all.x = T, all.y = T)
+STARTS <- merge(STARTS, minDateStart, by = c("Date", "Home"), all.x = T, all.y = T)
 
 SUB <- POS[, Idx := as.numeric(Idx)] %>% 
   merge(META, ., by = "Idx", all.x = T, all.y = T) %>% 
@@ -404,11 +404,11 @@ SUB <- POS[, Idx := as.numeric(Idx)] %>%
 STARTS <- STARTS[, P11 := rep(NA, nrow(STARTS))] %>% 
   .[, P12 := rep(NA, nrow(.))] %>% 
   .[, Sub := rep(0, nrow(.))] %>% 
-  .[, c(names(SUB)), with = F] 
+  .[, c(names(SUB)), with = F] %>% 
+  .[, Home := as.numeric(Home)]
 
-POS <- rbind(STARTS, SUB) %>% 
-  .[order(Idx)]
+test <- PLAYS[, Home := ifelse(HomeTeam == 0, 1, 0)] %>% 
+  merge(., STARTS, by = c("Date", "Home"), all.x = T)
 
-test <- merge(PLAYS, POS, by = c("Idx", "Date"), all = T)
 
 
