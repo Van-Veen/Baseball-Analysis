@@ -1,7 +1,6 @@
-
 library(data.table)
 library(magrittr)
-
+library(zoo)
 
 
 # The File path and working environment for this test dataset
@@ -96,8 +95,8 @@ write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitc
 # Reading the table back in. This should result in a long dataset where there is a single pitch result for every single row
 
 T2 <- read.csv("C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv",
-                col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
-                fill = T, header = F) %>% 
+               col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
+               fill = T, header = F) %>% 
   data.table(.) %>% 
   melt(., id.vars = "Idx") %>% 
   .[order(Idx)] %>% 
@@ -158,7 +157,7 @@ RSparse <- function(){
     .[, Idx := as.integer(Idx)]
   
   PLAYS <- PLAYS[Play != "NP"]
-
+  
   T1 <- PLAYS[, c("Idx", "Category", "RetroID", "Results"), with = F]
   
   T1 <- T1[, Results := sub(".*\\.", "", Results)] %>% 
@@ -373,13 +372,43 @@ POS <- DF[grep("start,|sub,", DF)] %>%
   data.table(.) %>% 
   setnames(., c(paste("V", seq(1, ncol(.), by = 1), sep = "")), c("Idx", "Category", "RetroID", "PlayerName", "Home", "BatOrder", "Position"))
 
+STARTS <- POS[, Idx := as.numeric(Idx)] %>% 
+  merge(META, ., by = "Idx", all.x = T, all.y = T) %>% 
+  .[, Date := na.locf(Date)] %>% 
+  .[!is.na(RetroID)] %>% 
+  .[Category == "start"] %>% 
+  .[, Position := paste("P", Position, sep = "")] %>% 
+  dcast(., Date + Category + Home  ~ Position, value.var = "RetroID")
 
+minDateStart <- POS[, Idx := as.numeric(Idx)] %>% 
+  merge(META, ., by = "Idx", all.x = T, all.y = T) %>% 
+  .[, Date := na.locf(Date)] %>% 
+  .[!is.na(RetroID)] %>% 
+  .[Category == "start"] %>% 
+  .[, list("Idx" = min(Idx)), by = Date]
 
+STARTS <- merge(STARTS, minDateStart, by = "Date", all.x = T, all.y = T)
 
+SUB <- POS[, Idx := as.numeric(Idx)] %>% 
+  merge(META, ., by = "Idx", all.x = T, all.y = T) %>% 
+  .[, Date := na.locf(Date)] %>% 
+  .[!is.na(RetroID)] %>% 
+  .[Category == "sub"] %>% 
+  .[, c("Idx", "Date", "RetroID", "Position", "Home"), with = F] %>% 
+  .[, Position := paste("P", Position, sep = "")] %>% 
+  dcast(., Date + Idx + Home ~ Position, value.var = "RetroID") %>% 
+  .[, Sub := rep(1, nrow(.))] %>% 
+  .[, c("Idx", "Date", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9",
+        "P11", "P12", "Home", "Sub"), with = F]
 
+STARTS <- STARTS[, P11 := rep(NA, nrow(STARTS))] %>% 
+  .[, P12 := rep(NA, nrow(.))] %>% 
+  .[, Sub := rep(0, nrow(.))] %>% 
+  .[, c(names(SUB)), with = F] 
 
+POS <- rbind(STARTS, SUB) %>% 
+  .[order(Idx)]
 
-
-
+test <- merge(PLAYS, POS, by = c("Idx", "Date"), all = T)
 
 
