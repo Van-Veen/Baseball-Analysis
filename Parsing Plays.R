@@ -5,7 +5,7 @@ library(zoo)
 
 # The File path and working environment for this test dataset
 fpw <- "C:/Users/jstewart/Downloads/2016eve/2016LAN.EVN"
-fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
+#fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
 # Writing an array for new column names to add to the lines we are going to read into working memory
 playCols <- c("Idx", "Category", "Inning", "HomeTeam", "RetroID", "Count", "Results", "Play" )
 
@@ -90,12 +90,12 @@ T1 <- T1[, Results := sub(".*\\.", "", Results)] %>%
 
 maxCol <- T1[, max(nchar(Results))]
 
-#write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
-write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+#write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
 # Reading the table back in. This should result in a long dataset where there is a single pitch result for every single row
 
 pp <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
-pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+#pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
 
 T2 <- read.csv(pp, col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
                fill = T, header = F) %>% 
@@ -143,7 +143,7 @@ T4 <- merge(T3, P1, all.x = T, all.y = T, by = c("Idx", "PlayCount"))
 RSparse <- function(){
   
   fpw <- "C:/Users/jstewart/Downloads/2016eve/2016LAN.EVN"
-  fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
+  #fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
   
   playCols <- c("Idx", "Category", "Inning", "HomeTeam", "RetroID", "Count", "Results", "Play" )
   
@@ -175,11 +175,11 @@ RSparse <- function(){
   
   maxCol <- T1[, max(nchar(Results))]
   
-  #write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
-  write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+  write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+  #write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
   
   pp <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
-  pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+  #pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
   
   T2 <- read.csv(pp, col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
                  fill = T, header = F) %>% 
@@ -428,17 +428,13 @@ SUB <- SUB[, (newSubCols) := rep(NA, nrow(SUB))] %>%
 test2 <- rbind(test, SUB) %>% 
   .[order(Idx)]
 
-#test2 <- test2[Date == "2016-04-12"]
-
-cw <- test2[Sub == 1 & !is.na(P1), c("Idx", "P1", "Home", "Date"), with = F]
-cw2 <- test2[, list("Idx" = max(Idx)), by = c("Date", "Home")] %>% 
-  .[, P1 := rep(NA, nrow(.))] %>% 
-  .[, names(cw), with = F]
-
-cw3 <- STARTS[, c("Idx", "P1", "Home", "Date"), with = F]
-
-CW <- rbind(cw, cw2, cw3) %>% 
-  .[order(Date, Idx)]
+# After thorough exploration, I've figured out a way to layer in RetroID identifiers for every defensive position in place while a specific batter is
+# at the plate. This is done with the subFiller function, and what it does is create a crosswalk based on the data frame specified in the df parameter. This
+# crosswalk is split into two, for home and away teams, and it has the index position for when the player either started or was substituted into the game, as
+# well as the date and indicator for home or away team. We then plug this info in in a piece wise fashion, indexing a range of our target data frame by Idx and
+# checking some additional parameters and altering the position's identifier as needed. The postion that is most given to substitutions is P1, the pitcher, and
+# running this function when targeting the P1 column, the processing speed isn't bad. However, I will want to look into optimizing and cleaning up this function
+# after getting more comfortable with the datasets.
 
 subFiller <- function(df, px){
   
@@ -449,20 +445,47 @@ subFiller <- function(df, px){
     setnames(., "t1", px) %>% 
     .[, names(cw), with = F]
   
-  cw3 <- STARTS[, c("Idx", px, "Home", "Date"), with = F]
+  cw3 <- df[, list("Idx" =  min(Idx)), by = c("Date", "Home")] %>% 
+    merge(., df[, c("Idx", px), with = F], by = "Idx", all.x = T) %>% 
+    unique(.) %>% 
+    .[, names(cw), with = F]
   
   crossWalk <- rbind(cw, cw2, cw3) 
+  crossWalk <- crossWalk[order(Date, Idx)]
+  
+  crossWalk_home <- crossWalk[Home == 1] %>% data.frame(.)
+  
+  crossWalk_home[, 2] <- ifelse(crossWalk_home[, 2] == "NA", NA, crossWalk_home[,2])
+  crossWalk_home[, 2] <- na.locf(crossWalk_home[, 2])
+  
+  crossWalk_away <- crossWalk[Home == 0] %>% data.frame(.) 
     
-  for(i in 1:nrow(crossWalk)){
-      
-      df[Idx >= crossWalk$Idx[i] & Idx <= crossWalk$Idx[i + 1] & Home == crossWalk$Home[i] & Date == crossWalk$Date[i], c(px) := crossWalk[i, 2]]
-      
-    }
+  crossWalk_away[, 2] <- ifelse(crossWalk_away[, 2] == "NA", NA, crossWalk_away[,2])
+  crossWalk_away[, 2] <- na.locf(crossWalk_away[, 2])
+  
+  for(i in 1:nrow(crossWalk_home) - 1){
+    
+    df[Idx >= crossWalk_home$Idx[i] & 
+         Idx <= crossWalk_home$Idx[i + 1] & 
+         Home == crossWalk_home$Home[i] & 
+         Date == crossWalk_home$Date[i], 
+       c(px) := crossWalk_home[i, 2]]
+    
+  }
+  
+  for(i in 1:nrow(crossWalk_away) - 1){
+    
+    df[Idx >= crossWalk_away$Idx[i] & 
+         Idx <= crossWalk_away$Idx[i + 1] & 
+         Home == crossWalk_away$Home[i] & 
+         Date == crossWalk_away$Date[i], 
+       c(px) := crossWalk_away[i, 2]]
+    
+  }
   
   return(df)
   
 }
-
 
 test2 <- subFiller(test2, "P1")
 test2 <- subFiller(test2, "P2")
@@ -476,9 +499,3 @@ test2 <- subFiller(test2, "P9")
 
 test2 <- test2[!is.na(RetroID)]
 
-tail(test2[Home == 1], 20)
-
-test2[Date == "2016-04-12", table(Inning, P1)]
-
-# It doesn't look like this is working right, cause looking at the game above it looks like Maeda was subbed back into the game for the 9th inning. I 
-# confirmed this as incorrect by loooking back at the SUB file...
