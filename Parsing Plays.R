@@ -521,5 +521,20 @@ PLAYS <- PLAYS[, PinchHit := ifelse(RetroID == P11, 1, 0)]
 
 PLAYS <- PLAYS[!is.na(RetroID), -c("P11", "P12", "Sub"), with = F]
 
+# Now lets examine some of the things that are in the Play field, to see if there are clear ways of determining events. We'll start off by looking at the 
+# distribution of whatever the first character of each Play string is. I suspect that these will help reveal other issues that exist in parsing out this 
+# dataset.
+
+PLAYS[!is.na(Play), table(substr(Play, 1, 1))]
+PLAYS[!is.na(Play) & substr(Play, 1, 1) == "C"]
+
+PLAYS[!is.na(Play) & substr(Play, 1,1) == "S", table(gsub("/", "", substr(Play, 1, 3)))] 
+PLAYS[!is.na(Play) & substr(Play, 1,1) == "D", table(gsub("/", "", substr(Play, 1, 3)))] 
+
+
+
+
+
+
 
 
