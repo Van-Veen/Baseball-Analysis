@@ -5,7 +5,7 @@ library(zoo)
 
 # The File path and working environment for this test dataset
 fpw <- "C:/Users/jstewart/Downloads/2016eve/2016LAN.EVN"
-
+fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
 # Writing an array for new column names to add to the lines we are going to read into working memory
 playCols <- c("Idx", "Category", "Inning", "HomeTeam", "RetroID", "Count", "Results", "Play" )
 
@@ -90,12 +90,14 @@ T1 <- T1[, Results := sub(".*\\.", "", Results)] %>%
 
 maxCol <- T1[, max(nchar(Results))]
 
-write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
-
+#write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
 # Reading the table back in. This should result in a long dataset where there is a single pitch result for every single row
 
-T2 <- read.csv("C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv",
-               col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
+pp <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+
+T2 <- read.csv(pp, col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
                fill = T, header = F) %>% 
   data.table(.) %>% 
   melt(., id.vars = "Idx") %>% 
@@ -141,6 +143,7 @@ T4 <- merge(T3, P1, all.x = T, all.y = T, by = c("Idx", "PlayCount"))
 RSparse <- function(){
   
   fpw <- "C:/Users/jstewart/Downloads/2016eve/2016LAN.EVN"
+  fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
   
   playCols <- c("Idx", "Category", "Inning", "HomeTeam", "RetroID", "Count", "Results", "Play" )
   
@@ -172,10 +175,13 @@ RSparse <- function(){
   
   maxCol <- T1[, max(nchar(Results))]
   
-  write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+  #write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+  write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
   
-  T2 <- read.csv("C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv",
-                 col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
+  pp <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+  pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+  
+  T2 <- read.csv(pp, col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
                  fill = T, header = F) %>% 
     data.table(.) %>% 
     melt(., id.vars = "Idx") %>% 
@@ -405,11 +411,10 @@ STARTS <- STARTS[, P11 := rep(NA, nrow(STARTS))] %>%
   .[, P12 := rep(NA, nrow(.))] %>% 
   .[, Sub := rep(0, nrow(.))] %>% 
   .[, c(names(SUB)), with = F] %>% 
-  .[, Home := as.numeric(Home)] %>% 
-  .[, c(-1), with = F]
+  .[, Home := as.numeric(Home)]
 
 test <- PLAYS[, Home := ifelse(HomeTeam == 0, 1, 0)] %>% 
-  merge(., STARTS, by = c("Date", "Home"), all.x = T) %>% 
+  merge(., STARTS[, c(-1), with = F], by = c("Date", "Home"), all.x = T) %>% 
   .[order(Idx)]
 
 # This process layers in the players and their respective positions relative to each pitch and play result at the moment. Now we need to figure out how to
@@ -423,26 +428,36 @@ SUB <- SUB[, (newSubCols) := rep(NA, nrow(SUB))] %>%
 test2 <- rbind(test, SUB) %>% 
   .[order(Idx)]
 
+#test2 <- test2[Date == "2016-04-12"]
 
+cw <- test2[Sub == 1 & !is.na(P1), c("Idx", "P1", "Home", "Date"), with = F]
+cw2 <- test2[, list("Idx" = max(Idx)), by = c("Date", "Home")] %>% 
+  .[, P1 := rep(NA, nrow(.))] %>% 
+  .[, names(cw), with = F]
+
+cw3 <- STARTS[, c("Idx", "P1", "Home", "Date"), with = F]
+
+CW <- rbind(cw, cw2, cw3) %>% 
+  .[order(Date, Idx)]
 
 subFiller <- function(df, px){
   
-  crossWalk <- df[Sub == 1 & !is.na(px), c("Idx", px, "Home", "Date"), with = F] %>% na.omit(.) %>% 
+  cw <- df[Sub == 1 & !is.na(px), c("Idx", px, "Home", "Date"), with = F] %>% na.omit(.) %>% 
     data.frame(.)
   
-  for(i in 1:nrow(crossWalk)){
+  cw2 <- df[, list("Idx" = max(Idx), t1 = "NA"), by = c("Date", "Home")] %>% 
+    setnames(., "t1", px) %>% 
+    .[, names(cw), with = F]
+  
+  cw3 <- STARTS[, c("Idx", px, "Home", "Date"), with = F]
+  
+  crossWalk <- rbind(cw, cw2, cw3) 
     
-    if(i != nrow(crossWalk)){
+  for(i in 1:nrow(crossWalk)){
       
       df[Idx >= crossWalk$Idx[i] & Idx <= crossWalk$Idx[i + 1] & Home == crossWalk$Home[i] & Date == crossWalk$Date[i], c(px) := crossWalk[i, 2]]
       
-    }else{
-      
-      df[Idx >= crossWalk$Idx[i] & Idx <= max(df$Idx) & Home == crossWalk$Home[i] & Date == crossWalk$Date[i], c(px) := crossWalk[i, 2]]
-      
     }
-    
-  }
   
   return(df)
   
@@ -461,10 +476,9 @@ test2 <- subFiller(test2, "P9")
 
 test2 <- test2[!is.na(RetroID)]
 
+tail(test2[Home == 1], 20)
 
 test2[Date == "2016-04-12", table(Inning, P1)]
 
 # It doesn't look like this is working right, cause looking at the game above it looks like Maeda was subbed back into the game for the 9th inning. I 
 # confirmed this as incorrect by loooking back at the SUB file...
-
-
