@@ -413,7 +413,7 @@ STARTS <- STARTS[, P11 := rep(NA, nrow(STARTS))] %>%
   .[, c(names(SUB)), with = F] %>% 
   .[, Home := as.numeric(Home)]
 
-test <- PLAYS[, Home := ifelse(HomeTeam == 0, 1, 0)] %>% 
+STARTS <- PLAYS[, Home := ifelse(HomeTeam == 0, 1, 0)] %>% 
   merge(., STARTS[, c(-1), with = F], by = c("Date", "Home"), all.x = T) %>% 
   .[order(Idx)]
 
@@ -423,9 +423,9 @@ test <- PLAYS[, Home := ifelse(HomeTeam == 0, 1, 0)] %>%
 newSubCols <- c("PlayCount", "Category", "Inning", "HomeTeam", "RetroID", "PitchCount", "Result", "Play", "homeLab", "visLab")
 
 SUB <- SUB[, (newSubCols) := rep(NA, nrow(SUB))] %>% 
-  .[, c(names(test)), with = F]
+  .[, c(names(STARTS)), with = F]
 
-test2 <- rbind(test, SUB) %>% 
+PLAYS <- rbind(STARTS, SUB) %>% 
   .[order(Idx)]
 
 # After thorough exploration, I've figured out a way to layer in RetroID identifiers for every defensive position in place while a specific batter is
@@ -487,15 +487,39 @@ subFiller <- function(df, px){
   
 }
 
-test2 <- subFiller(test2, "P1")
-test2 <- subFiller(test2, "P2")
-test2 <- subFiller(test2, "P3")
-test2 <- subFiller(test2, "P4")
-test2 <- subFiller(test2, "P5")
-test2 <- subFiller(test2, "P6")
-test2 <- subFiller(test2, "P7")
-test2 <- subFiller(test2, "P8")
-test2 <- subFiller(test2, "P9")
+PLAYS <- subFiller(PLAYS, "P1")
+PLAYS <- subFiller(PLAYS, "P2")
+PLAYS <- subFiller(PLAYS, "P3")
+PLAYS <- subFiller(PLAYS, "P4")
+PLAYS <- subFiller(PLAYS, "P5")
+PLAYS <- subFiller(PLAYS, "P6")
+PLAYS <- subFiller(PLAYS, "P7")
+PLAYS <- subFiller(PLAYS, "P8")
+PLAYS <- subFiller(PLAYS, "P9")
 
-test2 <- test2[!is.na(RetroID)]
+
+# Let's take a look now at pinch hitters and pinch runners. I need to first look into the rules and regulations involving these substitutions to better understand
+# the significance of this kind of event and how it can be statistically meaningful to track and analyze. In regards to pinch hitters, the actual batter who has
+# been substituted in is already present in the RetroID field, so my intuition is to just create a dummy indicator that signifies that batter's at-bats at that 
+# point in time represent the fact that he is pinch hitting. This would have to be done prior to parsing off the rows where RetroID == NA, those rows that
+# are unnecessarily left over from the rows of starters and substitutes in the subFiller function. I will first try to tackle this, before taking a closer look
+# at pinch runners
+
+PLAYS$P11[1] <- "xxxx001"
+PLAYS <- PLAYS[, P11 := na.locf(P11)]
+
+# It seems we can run na.locf from the zoo package on P11, but only after we install something in the very first element of this array. This is because the
+# function determines that the first element is already an NA, but it needs to replace the whole vector, so some of the replacements at the end of the vector
+# get recycled to the front most NA elements of the targeted vector. Becasue of this, I install a dummy RetroID, xxxxx001, to the very first element. This should
+# presumably work because it is very unlikely that a pinch hitter would be subbed in during the first at-bat of the first game of the season. After this, we can
+# index on rows where the RetroID == P11, then create a dummy variable indicating that these pitch results belong to a batter that is serving as a pinch hitter
+
+PLAYS <- PLAYS[, PinchHit := ifelse(RetroID == P11, 1, 0)]
+
+# At this point, I'm not sure what to do about pinch runners or how having these info might be useful. For the moment, I think I'll omit these and revisit their
+# utility at a latter date
+
+PLAYS <- PLAYS[!is.na(RetroID), -c("P11", "P12", "Sub"), with = F]
+
+
 
