@@ -5,7 +5,7 @@ library(zoo)
 
 # The File path and working environment for this test dataset
 fpw <- "C:/Users/jstewart/Downloads/2016eve/2016LAN.EVN"
-#fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
+fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
 # Writing an array for new column names to add to the lines we are going to read into working memory
 playCols <- c("Idx", "Category", "Inning", "HomeTeam", "RetroID", "Count", "Results", "Play" )
 
@@ -90,12 +90,12 @@ T1 <- T1[, Results := sub(".*\\.", "", Results)] %>%
 
 maxCol <- T1[, max(nchar(Results))]
 
-write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
-#write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+#write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
 # Reading the table back in. This should result in a long dataset where there is a single pitch result for every single row
 
 pp <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
-#pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
 
 T2 <- read.csv(pp, col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
                fill = T, header = F) %>% 
@@ -142,8 +142,8 @@ T4 <- merge(T3, P1, all.x = T, all.y = T, by = c("Idx", "PlayCount"))
 
 RSparse <- function(){
   
-  fpw <- "C:/Users/jstewart/Downloads/2016eve/2016LAN.EVN"
-  #fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
+  #fpw <- "C:/Users/jstewart/Downloads/2016eve/2016LAN.EVN"
+  fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
   
   playCols <- c("Idx", "Category", "Inning", "HomeTeam", "RetroID", "Count", "Results", "Play" )
   
@@ -175,11 +175,11 @@ RSparse <- function(){
   
   maxCol <- T1[, max(nchar(Results))]
   
-  write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
-  #write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+  #write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+  write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
   
-  pp <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
-  #pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+  #pp <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+  pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
   
   T2 <- read.csv(pp, col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
                  fill = T, header = F) %>% 
@@ -196,9 +196,10 @@ RSparse <- function(){
   T3 <- PLAYS %>% 
     .[, c("Idx", "Category", "Inning", "HomeTeam", "RetroID"), with = F] %>% 
     merge(., T2, all.x = T, all.y = T, by = "Idx") %>% 
-    .[, PlayCount := batterIndex(RetroID)]
+    .[, PlayCount := batterIndex(Idx)]
   
   P1 <- PLAYS[, c("Idx", "Results", "Play"), with = F] %>% 
+    .[, Results := sub(".*\\.", "", Results)] %>% 
     .[, Results := gsub("\\.", "", Results)] %>% 
     .[, PlayCount := nchar(Results)] %>% 
     .[, c("Idx", "Play", "PlayCount"), with = F] 
@@ -459,7 +460,7 @@ subFiller <- function(df, px){
   crossWalk_home[, 2] <- na.locf(crossWalk_home[, 2])
   
   crossWalk_away <- crossWalk[Home == 0] %>% data.frame(.) 
-    
+  
   crossWalk_away[, 2] <- ifelse(crossWalk_away[, 2] == "NA", NA, crossWalk_away[,2])
   crossWalk_away[, 2] <- na.locf(crossWalk_away[, 2])
   
@@ -530,8 +531,6 @@ PLAYS[!is.na(Play) & substr(Play, 1, 1) == "C"]
 
 PLAYS[!is.na(Play) & substr(Play, 1,1) == "S", table(gsub("/", "", substr(Play, 1, 3)))] 
 PLAYS[!is.na(Play) & substr(Play, 1,1) == "D", table(gsub("/", "", substr(Play, 1, 3)))] 
-
-
 
 
 
