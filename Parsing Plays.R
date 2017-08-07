@@ -604,6 +604,26 @@ PLAYS <- PLAYS[substr(Play, 1, 1) == "T", H := 1]
 
 PLAYS <- PLAYS[substr(Play, 1, 2) == "HR", H := 1]
 
+# Lets take a stab at figuring out scores. I think it would be best to parse out
+# the plays that involve changes in base running and work from there
+
+SCORES <- PLAYS[grep("\\.", Play)] %>% 
+  .[, BC1 := sub(".*\\.", "", Play) ] %>% 
+  .[, c("Idx", "Play", "PlayCount", "BC1"), with = F] %>% 
+  .[grep(";", BC1), BC2 := sub(";", "@", BC1)] %>% 
+  .[, BC1 := sub(";.*", "", BC1)] %>% 
+  .[, BC2 := sub(".*@", "", BC2)] %>% 
+  .[grep(";", BC2), BC3 := sub(";", "@", BC2)] %>% 
+  .[grep(";", BC3), BC4 := sub(".*;", "", BC3)] %>% 
+  .[, BC2 := sub(";.*", "", BC2)] %>% 
+  .[, BC3 := sub(".*@", "", BC3)] %>% 
+  .[, BC3 := sub(";.*", "", BC3)] %>% 
+  .[, PlayClean := sub("\\..*", "", Play)]
+
+
+
+
+
 
 
 
