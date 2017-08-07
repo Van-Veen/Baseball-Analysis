@@ -527,7 +527,7 @@ PLAYS <- PLAYS[!is.na(RetroID), -c("P11", "P12", "Sub"), with = F]
 # dataset.
 
 PLAYS[!is.na(Play), table(substr(Play, 1, 1))]
-PLAYS[!is.na(Play) & substr(Play, 1, 1) == "C"]
+PLAYS[!is.na(Play) & substr(Play, 1, 1) == "S"]
 
 PLAYS[!is.na(Play) & substr(Play, 1,1) == "S", table(gsub("/", "", substr(Play, 1, 3)))] 
 PLAYS[!is.na(Play) & substr(Play, 1,1) == "D", table(gsub("/", "", substr(Play, 1, 3)))] 
@@ -592,8 +592,17 @@ PLAYS[P1 == "maedk001", sum(Pitch), by = "RetroID"] %>% .[order(V1, decreasing =
 
 PLAYS[P1 == "maedk001" & RetroID == "goldp001", table(Play)]
 
+# Adding in some work here that identifies rows where the play can be considered a
+# hit, identifying singles, doubles, triples, and home runs. I'll have to add some
+# amendments later on to account for unique situations, like Fielder's choice, etc...
 
+PLAYS <- PLAYS[, H := 0] %>% 
+  .[!is.na(Play) & substr(Play, 1, 1) == "S" & substr(Play, 1, 2) != "SB", H := 1] 
 
+PLAYS <- PLAYS[substr(Play, 1, 1) == "D" & substr(Play, 1, 2) != "DI", H := 1]
+PLAYS <- PLAYS[substr(Play, 1, 1) == "T", H := 1]
+
+PLAYS <- PLAYS[substr(Play, 1, 2) == "HR", H := 1]
 
 
 
