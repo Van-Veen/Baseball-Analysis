@@ -5,7 +5,7 @@ library(zoo)
 
 # The File path and working environment for this test dataset
 fpw <- "C:/Users/jstewart/Downloads/2016eve/2016LAN.EVN"
-fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
+#fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
 # Writing an array for new column names to add to the lines we are going to read into working memory
 playCols <- c("Idx", "Category", "Inning", "HomeTeam", "RetroID", "Count", "Results", "Play" )
 
@@ -90,12 +90,12 @@ T1 <- T1[, Results := sub(".*\\.", "", Results)] %>%
 
 maxCol <- T1[, max(nchar(Results))]
 
-#write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
-write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+#write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
 # Reading the table back in. This should result in a long dataset where there is a single pitch result for every single row
 
 pp <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
-pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+#pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
 
 T2 <- read.csv(pp, col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
                fill = T, header = F) %>% 
@@ -142,8 +142,8 @@ T4 <- merge(T3, P1, all.x = T, all.y = T, by = c("Idx", "PlayCount"))
 
 RSparse <- function(){
   
-  #fpw <- "C:/Users/jstewart/Downloads/2016eve/2016LAN.EVN"
-  fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
+  fpw <- "C:/Users/jstewart/Downloads/2016eve/2016LAN.EVN"
+  #fpw <- "/Users/joelstewart/Downloads/2016eve/2016LAN.EVN"
   
   playCols <- c("Idx", "Category", "Inning", "HomeTeam", "RetroID", "Count", "Results", "Play" )
   
@@ -175,11 +175,11 @@ RSparse <- function(){
   
   maxCol <- T1[, max(nchar(Results))]
   
-  #write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
-  write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+  write.table(T1$New, "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
+  #write.table(T1$New, "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv", sep = ",", col.names = F, row.names = F, quote = F)
   
-  #pp <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
-  pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+  pp <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
+  #pp <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/pitches_parsed.csv"
   
   T2 <- read.csv(pp, col.names = c("Idx", paste("P", seq(1, maxCol, by = 1), sep = "")),
                  fill = T, header = F) %>% 
@@ -527,7 +527,7 @@ PLAYS <- PLAYS[!is.na(RetroID), -c("P11", "P12", "Sub"), with = F]
 # dataset.
 
 PLAYS[!is.na(Play), table(substr(Play, 1, 1))]
-PLAYS[!is.na(Play) & substr(Play, 1, 1) == "C"]
+PLAYS[!is.na(Play) & substr(Play, 1, 1) == "S"]
 
 PLAYS[!is.na(Play) & substr(Play, 1,1) == "S", table(gsub("/", "", substr(Play, 1, 3)))] 
 PLAYS[!is.na(Play) & substr(Play, 1,1) == "D", table(gsub("/", "", substr(Play, 1, 3)))] 
@@ -591,6 +591,78 @@ PLAYS[Date == x & P1 == "maedk001" & Inning == 5, c("RetroID", "Result", "Play")
 PLAYS[P1 == "maedk001", sum(Pitch), by = "RetroID"] %>% .[order(V1, decreasing = T)]
 
 PLAYS[P1 == "maedk001" & RetroID == "goldp001", table(Play)]
+
+# Adding in some work here that identifies rows where the play can be considered a
+# hit, identifying singles, doubles, triples, and home runs. I'll have to add some
+# amendments later on to account for unique situations, like Fielder's choice, etc...
+
+PLAYS <- PLAYS[, H := 0] %>% 
+  .[!is.na(Play) & substr(Play, 1, 1) == "S" & substr(Play, 1, 2) != "SB", H := 1] 
+
+PLAYS <- PLAYS[substr(Play, 1, 1) == "D" & substr(Play, 1, 2) != "DI", H := 1]
+PLAYS <- PLAYS[substr(Play, 1, 1) == "T", H := 1]
+
+PLAYS <- PLAYS[substr(Play, 1, 2) == "HR", H := 1]
+
+# Lets take a stab at figuring out scores. I think it would be best to parse out
+# the plays that involve changes in base running and work from there
+
+SCORES <- PLAYS[grep("\\.", Play)] %>% 
+  .[, BC1 := sub(".*\\.", "", Play) ] %>% 
+  .[, c("Idx", "Play", "PlayCount", "BC1"), with = F] %>% 
+  .[grep(";", BC1), BC2 := sub(";", "@", BC1)] %>% 
+  .[, BC1 := sub(";.*", "", BC1)] %>% 
+  .[, BC2 := sub(".*@", "", BC2)] %>% 
+  .[grep(";", BC2), BC3 := sub(";", "@", BC2)] %>% 
+  .[grep(";", BC3), BC4 := sub(".*;", "", BC3)] %>% 
+  .[, BC2 := sub(";.*", "", BC2)] %>% 
+  .[, BC3 := sub(".*@", "", BC3)] %>% 
+  .[, BC3 := sub(";.*", "", BC3)] %>% 
+  .[, PlayClean := sub("\\..*", "", Play)] %>% 
+  .[grep("\\(", Play), Error := gsub("\\(NR\\)", "", Play)] %>% 
+  .[grep("\\(", Play), Error := gsub("\\(UR\\)", "", Error)] %>% 
+  .[, Error := sub(".*\\(", "", Error)] %>% 
+  .[, Error := sub("\\).*", "", Error)] %>% 
+  .[grep("/TH", Error)]
+  
+
+# The syntax above does a pretty good job parsing out the base runner movements, or lack thereof. I started this as 
+# an exploratory effort looking into the methods for breaking out various elements of a coded play and extracting
+# derived measures from them in a systematic way. The short term desire here is to be able to extract our usual
+# metrics: hits, runs, errors, RBIs, strikeouts, etc... The longer term plan is to design a function that decodes
+# these plays into a human language, providing a narrative for each coded play. The syntax below is a better 
+# starting poing, as it firstly separates the play itself from the baserunner outcomes, then further separating
+# the play modifier codes from the play. This leaves us with three important variables. In 'Event' we have the action 
+# that starts the whole play, whether it is a hit, a strikeout, hit by pitch, whatever. Then we have, in the 'EventMod'
+# variable, a descriptive modifier of the action in the 'Event' field. This holds descriptions like where the ball was
+# hit on the field and what type of hit it was, among a variety of other things. Then we have the 'BaseMove' field,
+# which is a description of things that happen on the bases following the action detailed in the 'Event'. Things
+# like a runner advancing to another plate or somebody getting caught advancing or stealing are found here. The 
+# above syntax should be added here, since the item in 'BaseMove' can contain up to four base movements.
+
+
+PL <- PLAYS[!is.na(Play)] %>% 
+  .[, c("Idx", "Play", "PitchCount"), with = F] %>% 
+  .[grep("\\.", Play), Event := sub("\\..*", "", Play)] %>% 
+  .[!grep("\\.", Play), Event := Play] %>% 
+  .[grep("/", Event), EventMod := Event] %>% 
+  .[!is.na(EventMod), EventMod := sub("/", "@", EventMod)] %>% 
+  .[!is.na(EventMod), EventMod := sub(".*@", "", EventMod)] %>% 
+  .[, Event := sub("/.*", "", Event)] %>% 
+  .[grep("\\.", Play), BaseMove := sub(".*\\.", "", Play)]  
+  
+
+# Here, I'm going to experiment with coding some of the base movements explicitly. For a majority of situations,
+# the advance of the batter to any base is considered implicit. There are some situations where we see B-1 or B-x, 
+# where x is any of the bases. However, I think it would be good to include these advancements in a systematic way.
+# Like hit by pitches would be B-1 and home runs would be B-H...
+
+
+
+PL[, table(Event)]
+
+
+
 
 
 
