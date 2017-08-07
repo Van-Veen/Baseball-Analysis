@@ -532,6 +532,70 @@ PLAYS[!is.na(Play) & substr(Play, 1, 1) == "C"]
 PLAYS[!is.na(Play) & substr(Play, 1,1) == "S", table(gsub("/", "", substr(Play, 1, 3)))] 
 PLAYS[!is.na(Play) & substr(Play, 1,1) == "D", table(gsub("/", "", substr(Play, 1, 3)))] 
 
+# I'm going to shelve interpreting the Play field for now, however the few lines
+# above where very helpful in exploring the types of codes in this field and gave
+# me a launching point for further, in-depth exploration. I think the most pressing
+# thing to work on now is working with the Result field, which is the result for
+# every pitch. 
+
+# Firstly, I did some exploration looking at what the "*" symbol is in the Result 
+# field. This is just when the catcher blocks the current pitch. I don't think it 
+# will be very useful, however I'm not sure I want to omit it. We can easily omit
+# it from the pitch count, so that's not a problem. It may be interesting to see
+# how frequently this happens and to what effect it may have on the Pitcher's or 
+# catcher's performance. For now, we'll leave it be since we can already use the 
+# asterisk symbol to index these rows and the ones adjacent to it.
+
+# Situations where there is a plus symbol (+) signify a situation after a pitch that
+# the catcher attempts a pickoff, with the result, if any, in the next row. Therefore,
+# rows with the plus sign should not be counted as pitches and we can create a 
+# dummy indicator for pick offs by catcher by indexing these rows and iterating forward
+# by a value of one
+
+pickOffThrow <- grep("\\+", PLAYS$Result)
+
+PLAYS <- PLAYS[, catcherPO := rep(0, nrow(PLAYS))] %>% 
+  .[pickOffThrow + 1, catcherPO := 1]
+
+# Rows where result is ">" signify a base runner advancing prior or during the pitch
+# So I'm thinking of indexing these plus one to isolate pitch results and play 
+# results that occur during a time when a baserunner was advancing
+
+advancers <- grep(">", PLAYS$Result)
+
+PLAYS <- PLAYS[, advBR := rep(0, nrow(PLAYS))] %>% 
+  .[advancers + 1, advBR := 1]
+
+# Below, I create an index of codes representing pitching behaviors where the
+# behavior included can be counted as a pitch. This will be useful for calculating 
+# pitch counts and assessing pitcher degradation.
+
+countsAsPitch <- c("B", "C", "F", "H", "S", "I", "L", "M", "V",
+                   "K", "O", "P", "Q", "R", "T", "U", "X", "Y")
+
+PLAYS <- PLAYS[, Pitch := rep(0, nrow(PLAYS))] %>% 
+  .[Result %in% countsAsPitch, Pitch := 1]
+
+# Little test below, allows for me to sample a random game and get a count of 
+# pitches per pitcher per inning and then cross reference with the counts found
+# in the Pitchf/x database
+
+x <- sample(PLAYS$Date, 1)
+
+PLAYS[Date == x, sum(Pitch), by = c("Inning", "P1")] %>% 
+  dcast(., P1 ~ Inning, value.var = "V1")
+
+PLAYS[Date == x & P1 == "maedk001" & Inning == 5, c("RetroID", "Result", "Play"), with = F]
+
+
+PLAYS[P1 == "maedk001", sum(Pitch), by = "RetroID"] %>% .[order(V1, decreasing = T)]
+
+PLAYS[P1 == "maedk001" & RetroID == "goldp001", table(Play)]
+
+
+
+
+
 
 
 
