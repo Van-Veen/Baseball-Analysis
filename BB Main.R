@@ -73,3 +73,25 @@ advBatting <- function(playerName, atWork = F){
     
 }
 
+IDCW <- function(atWork = T){
+  
+  t1 <- t1 <- tableLoader("Master", atWork = atWork) %>% 
+    .[, nameFirst := gsub("\\. ", "\\.", nameFirst)] %>% 
+    .[, fullName := paste(nameFirst, nameLast, sep = " ")] %>% 
+    .[, recentYear := year(as.Date(finalGame))] %>% 
+    .[, c("playerID", "retroID", "bbrefID", "fullName", "recentYear"), with = F]
+  
+  t2 <- tableLoader("batting", atWork = atWork) %>% 
+    .[, c("playerID", "yearID", "teamID", "stint"), with = F] %>% 
+    .[, maxStint := max(stint), by = .(playerID, yearID)] %>% 
+    .[stint == maxStint] %>% 
+    .[, lastYear := max(yearID), by = playerID] %>% 
+    .[lastYear == yearID]
+  
+  t1 <- merge(t1, t2, by = "playerID", all.x = T) %>% 
+    .[, c("playerID", "retroID", "bbrefID", "fullName", "teamID", "recentYear"), with = F] 
+  
+  return(t1)
+  
+}
+

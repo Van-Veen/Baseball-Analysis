@@ -1,4 +1,9 @@
 
+# Future need for automated tests.
+# 1. In the prepBatters function, we will need to writeup some automated test to validate that the player name merged
+# with Lahman's is the appropriate player, not someone with the same name that last played in the 70s or someone with the
+# same name but on a different team
+
 
 
 library(data.table)
@@ -17,7 +22,31 @@ batters <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid
 # it is important to mention that there are other elements that can be pulled, so revisit how this function works
 # later on to see if there are other datapoints that may be useful.
 
-prepBatters <- function(batterURL){
+# First, though, I'm going to write a quick function that generates a retroID for players, namely rookies, that won't
+# have a retroID in the results of prepBatters.
+
+IDmaker <- function(fName, lName, atWork = T){
+  
+  t1 <- tableLoader("Master", atWork = atWork) %>% .[, unique(retroID)]
+  
+  newID <- ifelse(nchar(lName) == 3, paste(lName, "-", sep = ""), lName)
+  newID <- ifelse(nchar(lName) == 2, paste(lName, "--", sep = ""), lName)
+  newID <- tolower(substr(newID, 1, 4))
+  newID <- paste(newID, tolower(substr(fName, 1, 1)), sep = "")
+  
+  temp <- paste(newID, "0", sep = "")
+  
+  existing <- length(t1[grep(temp, t1)]) + 1
+  existing <- ifelse(nchar(existing) == 1, paste("00", existing, sep = ""), existing)
+  existing <- ifelse(nchar(existing) == 2, paste("0", existing, sep = ""), existing)
+
+  newID <- paste(newID, existing, sep = "")
+  
+  return(newID)
+  
+}
+
+prepBatters <- function(batterURL, atWork = T){
   
   batters <- suppressWarnings(readLines(batterURL)) %>% 
     trimws(.) %>% 
@@ -56,7 +85,28 @@ prepBatters <- function(batterURL){
     .[!is.na(position), position :=  mapvalues(position, from = c("P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"), to = c(paste("P", seq(1, 9), sep = "")))]
 
   
+  IDs <- IDCW(atWork = atWork)
+  
+  DF <- merge(DF, IDs, by = "fullName", all.x = T)
+  
+  MissingID <- DF[is.na(retroID)]
+  DF <- DF[!is.na(retroID)]
+  
+  newID <- rep("", nrow(MissingID))
+  firstNames <- MissingID$firstName
+  lastNames <- MissingID$lastName
+  
+  for(i in 1:nrow(MissingID)){
+    newID[i] <- IDmaker(firstNames[i], lastNames[i], atWork = atWork)
+  }
+  
+  MissingID <- MissingID[, retroID := newID]
+  
+  DF <- rbind(DF, MissingID) %>% 
+    setnames(., c("playerID.x", "playerID.y"), c("mlbID", "playerID"))
+  
   return(DF)
+  
   
 }
 
@@ -65,6 +115,30 @@ batterCW <- prepBatters(batters)
 # Now that we have a dataset that contains player id numbers, we can pull some of the game data, parse it out, and 
 # try to structure it in a way that will allow it to be stackable from older data pulled from RetroSheets.
 
+seqFiller <- function(x){
+  
+  newArray <- rep(x[1], length(x))
+  newArray[1] <- x[1]
+  currentItem <- x[1]
+  
+  for(i in 2:length(x)){
+    
+    if(is.na(x[i])){
+      
+      newArray[i] <- currentItem
+      
+    }else{
+      
+      currentItem <- x[i]
+      newArray[i] <- x[i]
+      
+    }
+    
+  }
+  
+  return(newArray)
+  
+}
 
 plays_path <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1/game_events.xml"
 
@@ -207,7 +281,13 @@ EVE[grep("OFFENSIVE", play)] # Pinch Hitters
 EVE[grep("PITCHING", play)] # Pitching Changes
 EVE[grep("WILD PITCH", descriptions)] # Wild Pitch
 EVE[grep("GROUNDS OUT", play)]
-EVE[grep("TO 2ND", descriptions)]
+EVE[grep("TO 2ND", play)]
+EVE[grep("LINES OUT", play)]
+EVE[grep("LINE DRIVE", play)]
+EVE[grep("WALKS", play)]
+EVE[grep("To 3RD", play)]
+EVE[grep("FLIES OUT", play)]
+
 
 EVE[grep("STRIKES", play)]
 EVE[grep("SINGLES", play)]
@@ -218,101 +298,5 @@ EVE[grep("SCORES", play)]
 
 
 
-
-
-
-library(data.table)
-
-# Getting batters ID, first and last names, number, and team label for a given game on a specific date, via gd2.mlb.com
-
-batters <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1/players.xml"
-
-# This function takes in a URL from gd2.mlb.com that contains player info and parses out specific lines, the ones
-# mentioned above, building a database of identifiers for each player on both teams for a given date and match.
-# The important part here is the 'playerID'. This identifier is specified in other data that we will be pulling
-# and we will use this as a crosswalk to attach the players name to a given play
-
-# it is important to mention that there are other elements that can be pulled, so revisit how this function works
-# later on to see if there are other datapoints that may be useful.
-
-prepBatters <- function(batterURL){
-  
-  batters <- suppressWarnings(readLines(batterURL)) %>% 
-    trimws(.) %>% 
-    .[grep("<player id=", .)] %>% 
-    strsplit(., "\"") %>% 
-    unlist(.) %>% 
-    gsub("<|=", "", .) %>% 
-    trimws(.)
-  
-  playerID <- batters[c(grep("player id", batters) + 1)]
-  firstName <- batters[c(grep("first", batters) + 1)]
-  lastName <- batters[c(grep("last", batters) + 1)]
-  shirtNum <- batters[c(grep("num", batters) + 1)]
-  team <- batters[c(grep("team_abbrev", batters) + 1)]
-  
-  DF <- data.table(playerID, firstName, lastName, shirtNum, team)
-  
-  return(DF)
-  
-}
-
-test <- prepBatters(batters)
-
-
-# Now that we have a dataset that contains player id numbers, we can pull some of the game data, parse it out, and 
-# try to structure it in a way that will allow it to be stackable from older data pulled from RetroSheets.
-
-
-plays_path <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1/game_events.xml"
-
-
-test2 <- readLines(plays_path) %>% 
-  trimws(.)
-
-
-
-test2[grep("batter=", test2)] %>% length(.)
-test2[grep("pitcher=", test2)] %>% length(.)
-
-
-
-bat_idx <- grep("atbat num=", test2)
-
-test2[5:28] %>% .[grep("pitch sv_id=", .)]
-
-
-prepEvents <- function(eventURL){
-  
-  events <- suppressWarnings(readLines(eventURL)) %>% trimws(.)
-  
-  bat_idx <- c(grep("atbat num=", events), length(events))
-  
-  pitchCounts <- rep(0, length(bat_idx) - 1)
-  
-  for(i in 1:length(bat_idx) - 1){
-    
-    x <- bat_idx[i]
-    y <- bat_idx[i + 1]
-    
-    pitchCounts[i] <- events[x:y] %>% .[grep("pitch sv_id=", .)] %>% length(.)
-    
-  }
-  
-  #T1 <- events[x:y] %>% .[grep("pitch sv_id=", .)] %>% length(.)
-
-  
-  return(pitchCounts)
-  
-}
-
-
-prepEvents(plays_path) %>% length(.)
-
-test <- prepEvents(plays_path)
-
-x <- 72
-
-test2[test[x]:test[x + 1]]
 
 
