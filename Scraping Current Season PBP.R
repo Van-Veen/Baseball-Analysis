@@ -1,5 +1,8 @@
 
-
+# Future need for automated tests.
+# 1. In the prepBatters function, we will need to writeup some automated test to validate that the player name merged
+# with Lahman's is the appropriate player, not someone with the same name that last played in the 70s or someone with the
+# same name but on a different team
 
 
 
@@ -19,7 +22,31 @@ batters <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid
 # it is important to mention that there are other elements that can be pulled, so revisit how this function works
 # later on to see if there are other datapoints that may be useful.
 
-prepBatters <- function(batterURL){
+# First, though, I'm going to write a quick function that generates a retroID for players, namely rookies, that won't
+# have a retroID in the results of prepBatters.
+
+IDmaker <- function(fName, lName, atWork = T){
+  
+  t1 <- tableLoader("Master", atWork = atWork) %>% .[, unique(retroID)]
+  
+  newID <- ifelse(nchar(lName) == 3, paste(lName, "-", sep = ""), lName)
+  newID <- ifelse(nchar(lName) == 2, paste(lName, "--", sep = ""), lName)
+  newID <- tolower(substr(newID, 1, 4))
+  newID <- paste(newID, tolower(substr(fName, 1, 1)), sep = "")
+  
+  temp <- paste(newID, "0", sep = "")
+  
+  existing <- length(t1[grep(temp, t1)]) + 1
+  existing <- ifelse(nchar(existing) == 1, paste("00", existing, sep = ""), existing)
+  existing <- ifelse(nchar(existing) == 2, paste("0", existing, sep = ""), existing)
+
+  newID <- paste(newID, existing, sep = "")
+  
+  return(newID)
+  
+}
+
+prepBatters <- function(batterURL, atWork = T){
   
   batters <- suppressWarnings(readLines(batterURL)) %>% 
     trimws(.) %>% 
@@ -58,7 +85,28 @@ prepBatters <- function(batterURL){
     .[!is.na(position), position :=  mapvalues(position, from = c("P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"), to = c(paste("P", seq(1, 9), sep = "")))]
 
   
+  IDs <- IDCW(atWork = atWork)
+  
+  DF <- merge(DF, IDs, by = "fullName", all.x = T)
+  
+  MissingID <- DF[is.na(retroID)]
+  DF <- DF[!is.na(retroID)]
+  
+  newID <- rep("", nrow(MissingID))
+  firstNames <- MissingID$firstName
+  lastNames <- MissingID$lastName
+  
+  for(i in 1:nrow(MissingID)){
+    newID[i] <- IDmaker(firstNames[i], lastNames[i], atWork = atWork)
+  }
+  
+  MissingID <- MissingID[, retroID := newID]
+  
+  DF <- rbind(DF, MissingID) %>% 
+    setnames(., c("playerID.x", "playerID.y"), c("mlbID", "playerID"))
+  
   return(DF)
+  
   
 }
 
@@ -67,6 +115,30 @@ batterCW <- prepBatters(batters)
 # Now that we have a dataset that contains player id numbers, we can pull some of the game data, parse it out, and 
 # try to structure it in a way that will allow it to be stackable from older data pulled from RetroSheets.
 
+seqFiller <- function(x){
+  
+  newArray <- rep(x[1], length(x))
+  newArray[1] <- x[1]
+  currentItem <- x[1]
+  
+  for(i in 2:length(x)){
+    
+    if(is.na(x[i])){
+      
+      newArray[i] <- currentItem
+      
+    }else{
+      
+      currentItem <- x[i]
+      newArray[i] <- x[i]
+      
+    }
+    
+  }
+  
+  return(newArray)
+  
+}
 
 plays_path <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1/game_events.xml"
 
