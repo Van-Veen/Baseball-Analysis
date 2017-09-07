@@ -1,0 +1,76 @@
+
+
+gameURL <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1/game_events.xml"
+
+
+library(XML)
+
+# the xmlParse function essentially reads in the file, maintining its node structure in the XML format. 
+
+test <- xmlParse(file = gameURL)
+
+# This identifies the root nodes, the topmost level of nodes within the xml file. In this effort, there are
+# 12 different nodes. The first 9 are for the first 9 innings of the game whilst the remaining 3 are programmatic
+# xml things. Similarly, in other situations there will be different numbers of nodes, say, for when there are extra innings.
+# This is why we need to find a way to explicilty target subnodes.
+
+rootnode <- xmlRoot(test)
+
+# This just gets the count of rootnodes, for this example, and previously noted, there are 12 total...
+
+rootsize <- xmlSize(rootnode)
+
+# We can index and subindex rootnodes. The first example gives us everything contained within the first node. This 
+# contains data for the first inning and is surrounded by <inning> </inning> tags. There is a qualifier in the initial
+# tag, metadata that contains the inning's number. Thus the opening tag is actually <inning num="1">
+
+# In the second line, we are pulling the topmost node within the first rootnode. In this example, the topmost node of the
+# first node is <top>, meaning the top of the first inning. When I run the third example I get <bottom>, or rather, the
+# bottom of the first inning
+
+rootnode[1]
+rootnode[[1]][[1]]
+rootnode[[1]][[2]]
+
+names(rootnode)  %>% table(.)
+names(rootnode[[1]][[1]][[1]]) %>% length(.)
+
+rootnode[[1]][[1]] %>% xmlSize(.)
+rootnode[[1]][[1]] %>% xmlChildren(.)
+rootnode[[1]][[1]][[1]] %>% xmlAttrs(.)
+rootnode[[1]][[1]][[1]] %>% xmlGetAttr("des")
+rootnode[[1]][[1]][[2]] %>% xmlGetAttr("des")
+
+parseRoot <- function(mlbURL){
+  
+  t1 <- xmlParse(mlbURL) %>% xmlRoot(.)
+  
+  n1 <- sum(names(t1) == "inning")
+  
+  for(i in 1:n1){
+    
+    for(j in 1:2){
+      
+      temp <- t1[[i]][[j]]
+      
+    }
+    
+    
+  }
+  
+  return(temp)
+  
+}
+
+parseRoot(gameURL)
+
+https://www.stat.berkeley.edu/~statcur/Workshop2/Presentations/XML.pdf
+
+
+
+
+
+
+
+
+
