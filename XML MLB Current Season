@@ -1,9 +1,13 @@
 
 
+
+
+
 gameURL <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1/game_events.xml"
 
 
 library(XML)
+library(magrittr)
 
 # the xmlParse function essentially reads in the file, maintining its node structure in the XML format. 
 
@@ -41,7 +45,7 @@ rootnode[[1]][[1]][[1]] %>% xmlAttrs(.)
 rootnode[[1]][[1]][[1]] %>% xmlGetAttr("des")
 rootnode[[1]][[1]][[2]] %>% xmlGetAttr("des")
 
-parseRoot <- function(mlbURL){
+parseRoot <- function(mlbURL, item){
   
   t1 <- xmlParse(mlbURL) %>% xmlRoot(.)
   
@@ -51,21 +55,44 @@ parseRoot <- function(mlbURL){
     
     for(j in 1:2){
       
-      temp <- t1[[i]][[j]]
+      n2 <- length(names(t1[[i]][[j]]))
+      
+      for(k in 1:n2){
+        
+        # here we could specify the attribute, passing it from an additional function argument,
+        # and having that pushed into an array with the previous loop parameters that can be
+        # later converted piecemeal
+        
+        # i = 1
+        # j = 1
+        # 
+      }
       
     }
     
     
   }
   
-  return(temp)
+  return(n2)
   
 }
 
 parseRoot(gameURL)
 
+rootnode[[9]][[2]]
+
+
+
+
 https://www.stat.berkeley.edu/~statcur/Workshop2/Presentations/XML.pdf
 
+
+library(RJSONIO)
+
+gameURL2 <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1/game_events.json"
+
+test2 <- RJSONIO::fromJSON(gameURL2)
+test2[['data']][['game']]
 
 
 
