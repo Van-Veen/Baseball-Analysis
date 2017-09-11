@@ -1,175 +1,55 @@
 
 
 
+library(XML)
+library(magrittr)
+library(data.table)
+library(lubridate)
+library(plyr)
+library(stringr)
+
+loadSource <- function(fileName, atWork = F){
+  
+  fp <- "/Users/joelstewart/Desktop/Baseball Analysis/Syntax/"
+  fpw <- "C:/Users/jstewart/Desktop/Baseball Analysis/Syntax/"
+  
+  if(atWork == T){
+    source(paste(fpw, fileName, ".R", sep = ""))
+  }else{
+    source(paste(fp, fileName, ".R", sep = ""))
+  }
+  
+  #return(targetSource)
+  
+}
+
+loadSource("BB Main", T)
+
+IDmaker <- function(fName, lName, atWork = T){
+  
+  t1 <- tableLoader("Master", atWork = atWork) %>% .[, unique(retroID)]
+  
+  newID <- ifelse(nchar(lName) == 3, paste(lName, "-", sep = ""), lName)
+  newID <- ifelse(nchar(lName) == 2, paste(lName, "--", sep = ""), lName)
+  newID <- tolower(substr(newID, 1, 4))
+  newID <- paste(newID, tolower(substr(fName, 1, 1)), sep = "")
+  
+  temp <- paste(newID, "0", sep = "")
+  
+  existing <- length(t1[grep(temp, t1)]) + 1
+  existing <- ifelse(nchar(existing) == 1, paste("00", existing, sep = ""), existing)
+  existing <- ifelse(nchar(existing) == 2, paste("0", existing, sep = ""), existing)
+  
+  newID <- paste(newID, existing, sep = "")
+  
+  return(newID)
+  
+}
 
 
 gameURL <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1/game_events.xml"
 
-
-library(XML)
-library(magrittr)
-
-# the xmlParse function essentially reads in the file, maintining its node structure in the XML format. 
-
-test <- xmlParse(file = gameURL)
-
-# This identifies the root nodes, the topmost level of nodes within the xml file. In this effort, there are
-# 12 different nodes. The first 9 are for the first 9 innings of the game whilst the remaining 3 are programmatic
-# xml things. Similarly, in other situations there will be different numbers of nodes, say, for when there are extra innings.
-# This is why we need to find a way to explicilty target subnodes.
-
-rootnode <- xmlRoot(test)
-
-# This just gets the count of rootnodes, for this example, and previously noted, there are 12 total...
-
-rootsize <- xmlSize(rootnode)
-
-# We can index and subindex rootnodes. The first example gives us everything contained within the first node. This 
-# contains data for the first inning and is surrounded by <inning> </inning> tags. There is a qualifier in the initial
-# tag, metadata that contains the inning's number. Thus the opening tag is actually <inning num="1">
-
-# In the second line, we are pulling the topmost node within the first rootnode. In this example, the topmost node of the
-# first node is <top>, meaning the top of the first inning. When I run the third example I get <bottom>, or rather, the
-# bottom of the first inning
-
-rootnode[1]
-rootnode[[1]][[1]]
-rootnode[[1]][[2]]
-
-names(rootnode)  %>% table(.)
-names(rootnode[[1]][[1]][[1]]) %>% length(.)
-
-rootnode[[1]][[1]] %>% xmlSize(.)
-rootnode[[1]][[1]] %>% xmlChildren(.)
-rootnode[[1]][[1]][[1]] %>% xmlAttrs(.)
-rootnode[[1]][[1]][[1]] %>% xmlGetAttr("des")
-rootnode[[1]][[1]][[2]] %>% xmlGetAttr("des")
-
-
-
-# We begin by getting a count of innings in the game. By taking the sum of a logical testing comparing
-# the names of every toplevel node that is equal to "inning' gives us this count. It will mostly be
-# 9 innings, but there will often be exceptions...
-
-sum(names(rootnode) == "inning")
-
-# The result will set the parameters of our first loop, which will loop through each inning iteratively.
-# For the purposes of this endeavor, we will just be looking at the first inning, subset like this:
-
-rootnode[[1]]
-
-# Here, you can see the next level of nodes comprises of 'top' and 'bottom'
-
-names(rootnode[[1]])
-
-# That means this info is structured by inning and subsequently by the top or bottom of the inning. The
-# parameters here will setup the functioning of our second level loop, and, at first, I thought it best
-# to explicitly program this loop to iterate twice (1:2). However, on further examination, I realized
-# that it is possible for there to be only one 2nd level node, particularly occurring during a game 
-# ending after the top of the ninth inning. Thus, we'll have to program a count test to setup the 
-# parameters of our second level loop
-
-length(names(rootnode[[1]])) # N = 2, naturally
-
-# Let's look at the top and bottom of the first inning
-
-rootnode[[1]][[1]] # Top of first inning
-rootnode[[1]][[2]] # Bottom of first inning
-
-# Now, we'll need a third level loop to dive into each item within each subdivision of every inning. 
-# This is particularly important, because the number of items within each innings subdivision will vary. 
-# It will likely be a common 1-2-3 situation, with 3 batters up and out, like in the top of the first
-
-names(rootnode[[1]][[1]]) # 3 at-bats
-
-# However, there could be more than 3 batters, like in the top of the second:
-
-names(rootnode[[2]][[1]])
-
-# And there are also 'action' items, particularly substitutions, more commonly in the latter stages
-# of the game
-
-names(rootnode[[9]][[2]])
-
-# So, we'll need to get the count of items in this third level
-
-length(names(rootnode[[1]][[1]])) # There are 3 events in the top of the first
-length(names(rootnode[[1]][[2]])) # And 3 events in the bottom of the first
-
-# Now, there are a couple of things to not moving forward. If the the event is an 'atbat', then we need
-# to dive down one more level with another loop. Because our effort here is to get the result of every 
-# pitch, then we will need to get the length of items within each atbat. There is a node called 'pitch'
-# that contains this data. Obviously, there will be varying counts of pitches
-
-names(rootnode[[1]][[1]][[1]]) # 3 pitches to the first batter in the top of the first inning
-names(rootnode[[1]][[1]][[2]]) # 4 pitches to the second batter in the top of the first
-names(rootnode[[1]][[1]][[3]]) # 1 pitch to the third batter...
-
-# We can scrape the result of these by pulling the attribute 'des' from each pitch. Let's scrape this attribute
-# for every pitch to the first batter in the top of the first inning
-
-rootnode[[1]][[1]][[1]][[1]] %>% xmlGetAttr("des") # First pitch is a ball
-rootnode[[1]][[1]][[1]][[2]] %>% xmlGetAttr("des") # Second pitch is a foul
-rootnode[[1]][[1]][[1]][[3]] %>% xmlGetAttr("des") # Third pitch is hit, put into play, resulting in an out
-
-# So, we can pull pitch results by looping down through 4 levels of nodes, requiring 4 nested loops. However, 
-# the tricky part is that there is info needed in the third node level as well, that's the atbat level
-
-rootnode[[1]][[1]][[1]] %>% xmlAttrs(.)
-
-# There are a ton of attributes in the third level. Here's what we'll need to pull:
-
-# 1. num : This is the atbat number
-# 2. batter : This is a numeric code for the player at bat
-# 3. pitcher : This is the numeric code for the pitcher 
-# 4. des : this is a text description of the play
-# 5. event_num : This is an event number, will use similarly to Idx in retrosheets
-# 6. event : This is a simplified play result
-
-# Another complication: There can be more than one event attribute: look at this
-
-rootnode[[3]][[1]][[3]] %>% xmlAttrs(.)
-
-# In the third at bat during the top of the third, two things happen: A batter strikes out and a baserunner
-# is caught stealing second base. There is an attribute, 'event' for the strikeout, and a second attribute,
-# called 'event2' for the baserunner caught stealing. We will have to account for this, probably with regular
-# expressions.
-
-# Another thing to compensate for is that, in the third level, we'll need to do something different for action
-# items. Remember the ninth inning:
-
-rootnode[[9]][[2]] %>% names(.) # There are 3 actions and three atbats
-
-rootnode[[9]][[2]][[1]] # Defensive substitution
-rootnode[[9]][[2]][[2]] # Pitcher substitution
-rootnode[[9]][[2]][[6]] # Offensive substitution; pinch hitter
-
-# Pitcher subs should be regarded with little or no concern, since the next item in the iteration will have
-# the newly subbed pitcher's id number in the atbat. This should hold true for the offensive sub as well. 
-# However, we'll have to find a way to work in the defensive subs, so that the P1 through P9 in the defensive
-# position variables are correctly accounted for... My first thought is to have this parsing application process
-# these 'event' nodes separately from the 'atbat' nodes, working them into the processed data frame side effect
-# later on in the schema. I'll start with this in mind, but rework it later if I find it to be too arduous or
-# innefectual. Overall, it shouldnt be too difficult to rework in these actions because the event number works
-# iteratively, allowing us to know the order in which these third level nodes occur
-
-# So, with a focus on pulling just atbat data. Overall, the idea is that we need to pull 4th level pitch results and
-# adhere them to relevant data from the third level atbat attributes. We will practice this process on two test samples. 
-# The first will be the top of the first inning, containing only 3 atbats. The second test will be used to process atbats
-# and action items separately and well use a subset from the bottom of the ninth inning. Getting to these levels is pretty
-# simple, involving two nested loops (i and j) that loop, at the first level, through the innings and subsequently through 
-# the top and/or bottom of the inning
-
-test <- rootnode[[1]][[1]]
-test2 <- rootnode[[9]][[2]]
-
-# Syntax used to explore testing on test and test2 subsets has been omitted and the discovery derived from the work on these
-# two subsets has been implicated in the function, called parseMLB, below. This function takes in a url from a given game
-# in xml format and processes it into a data.table for which subsequent added values and processes are needed. 
-
-test <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1/game_events.xml"
-
-parseMLB <- function(gameURL){
+eventParse <- function(gameURL){
 
   
   root <- xmlParse(file = gameURL) %>% xmlRoot(.)
@@ -186,6 +66,8 @@ parseMLB <- function(gameURL){
     for(section in 1:N2){
       
       N3 <- root[[inning]][[section]] %>% names(.) %>% length(.)
+      
+      if(N3 != 0){
       
       for(action in 1:N3){
         
@@ -214,25 +96,14 @@ parseMLB <- function(gameURL){
             
             PITCHES <- rbind(PITCHES, T3)
             
-            
-          }
-          
-        }
-        
-      }
-      
-      
-    }
-    
-    
-  }
+            }}}}}}
   
   PLAYS <- dcast(PLAYS, Idx ~ Var, value.var = "Val")
   PLAYS <- PLAYS[Idx > 0]
   PLAYS <- PLAYS[, Date := as.Date(substr(start_tfs_zulu, 1, 10))]
   
   omits <- c("away_team_runs", "b1", "b2", "b3", names(PLAYS)[grep("_es", names(PLAYS))], "home_team_runs", "pitch", "play_guid", 
-             "player", "rbi", "score", "start_tfs", "tfs", "tfs_zulu", "NA", "start_tfs_zulu")
+             "player", "rbi", "score", "start_tfs", "tfs", "tfs_zulu", "NA", "start_tfs_zulu", "event_num", "o", "s", "b")
   
   PLAYS <- PLAYS[, c(names(PLAYS) %in% omits == F), with = F]
   
@@ -249,12 +120,119 @@ parseMLB <- function(gameURL){
 }
 
 
-temp <- parseMLB(test)
-print(temp)
 
 
+players <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1/players.xml"
+
+playerParse <- function(mlbURL){
+  
+  DF <- xmlRoot(xmlParse(mlbURL))
+  PLAYERS <- data.table("Val" = NA, "Var" = NA, "mlbID" = NA)
+  
+  for(team in 1:length(names(DF))){
+    
+    if(as.character(names(DF))[team] == "team"){
+      
+      N1 <- sum(names(DF[[team]]) == "player")
+      
+      for(player in 1:N1){
+        
+        ID <- DF[[team]][[player]] %>% xmlGetAttr("id")
+        
+        T1 <- DF[[team]][[player]] %>% xmlAttrs(.) %>% data.frame(.)
+        T1$Var <- rownames(T1)
+        T1 <- data.table(T1) %>% setnames(., names(.), c("Val", "Var"))
+        T1 <- T1[, mlbID := rep(ID, nrow(T1))]
+        
+        PLAYERS <- rbind(PLAYERS, T1)
+        
+      }}}
+  
+   PLAYERS <- PLAYERS[is.na(mlbID) == F] %>% 
+     dcast(., mlbID ~ Var, value.var = "Val") %>% 
+     .[, fullName := paste(first, last, sep = " ")] %>% 
+     .[, c("mlbID", "fullName", "game_position", "team_abbrev", "first", "last"), with = F] %>% 
+     .[, first := as.character(first)] %>% 
+     .[, last := as.character(last)]
+   
+   RETRO <- tableLoader("master", atWork = T) %>% 
+     .[, nameFirst := gsub("\\. ", "\\.", nameFirst)] %>% 
+     .[, fullName := paste(nameFirst, nameLast, sep = " ")] %>%
+     .[year(as.Date(finalGame)) %in% c(year(today()) - c(1, 2))] %>% 
+     .[, c("retroID", "fullName"), with = F]
+   
+   PLAYERS <- merge(PLAYERS, RETRO, by = "fullName", all.x = T) %>% 
+     .[, retroID := ifelse(is.na(retroID), IDmaker(first, last, T), retroID)] %>% 
+     .[, game_position := mapvalues(game_position, c("P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"),
+       c("P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"))]
+  
+  return(PLAYERS)
+  
+}
+
+test <- playerParse(players)
 
 
+test <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1"
+gameURL <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_09/gid_2017_08_09_lanmlb_arimlb_1"
+test2 <- "http://gd2.mlb.com/components/game/mlb/year_2017/month_08/day_01/gid_2017_08_01_kcamlb_balmlb_1"
 
 
+parseMLB <- function(gameURL){
+  
+  event_url <- paste(gameURL, "game_events.xml", sep = "/")
+  player_url <- paste(gameURL, "players.xml", sep = "/")
+  
+  PLAYS <- eventParse(event_url) %>% 
+    .[, batter := as.character(batter)]
+  
+  PLAYERS <- suppressWarnings(playerParse(player_url))
+  
+  PLAYERS_arr <- c(PLAYERS$fullName)
+  RETROID_arr <- c(PLAYERS$retroID)
+  
+  STARTERS <- PLAYERS[!is.na(game_position)] %>% 
+    dcast(., team_abbrev ~ game_position, value.var = "retroID") %>% 
+    .[, c("team_abbrev", c(paste("P", seq(2,9), sep = ""))), with = F] %>% 
+    setnames(., "team_abbrev", "defTeam")
+  
+  PLAYERS2 <- PLAYERS[, c("mlbID", "team_abbrev"), with = F]
+  teamCat <- as.character(unique(PLAYERS2$team_abbrev))
+  PLAYERS2 <- PLAYERS2[, team_abbrev := ifelse(team_abbrev == teamCat[1], teamCat[2], teamCat[1])] %>% setnames(., names(.), c("batter", "defTeam"))
+    
+  PLAYS <- merge(PLAYS, PLAYERS2, by = "batter", all.x = T) %>% 
+    .[order(Idx)]
+  
+  minIdx <- PLAYS[, min(Idx), by = defTeam]
+  
+  STARTERS <- merge(STARTERS, minIdx, by = "defTeam", all.x = T) %>% setnames(., "V1", "Idx")
+  
+  PLAYS <- merge(PLAYS, STARTERS, all.x = T, by = "Idx") %>% 
+    .[, pitcher := mapvalues(pitcher, PLAYERS$mlbID, PLAYERS$retroID)] %>% 
+    .[, batter := mapvalues(batter, PLAYERS$mlbID, PLAYERS$retroID)] %>% 
+    .[, -c(grep("defTeam", names(.))), with = F]
+  
+  SUBS <- PLAYS[is.na(batter)] %>% 
+    .[, des := trimws(des)] %>% 
+    .[event %in% c("Game Advisory", "Pitching Substitution") == F] %>% 
+    .[!grep("Pinch-hitter", des)]
 
+  
+  return(PLAYS)
+  
+}
+
+temp <- parseMLB(test2)
+
+# Things to incorporate into the parseMLB function:
+# 1. Translating 'des' field into something similar to the play field in RetroSheets
+# 2. Make the Play show up just once in the pitch array, at the appropriate point
+# 3. Figure out what to do with multiple event per line
+# 4. Add count
+# 5. Recode PitchResult
+# X. Recode batter to RetroID
+# 7. Include defensive positions
+# 8. Figure out what to do with substitutions
+
+
+playerParse(players)
