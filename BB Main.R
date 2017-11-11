@@ -30,6 +30,18 @@ getPlayer <- function(playerName, atWork = F){
   return(DF)
 }
 
+bbref <- function(playerName){
+  
+  ID <- getPlayer(playerName)$bbrefID
+  firstInitial <- substr(ID, 1, 1)
+  baseURL <- "https://www.baseball-reference.com/players/"
+  
+  finalURL <- paste(baseURL, firstInitial, "/", ID, ".shtml", sep = "")
+  
+  browseURL(finalURL)
+  
+}
+
 batting <- function(playerName, atWork = F){
   player <- getPlayer(playerName, atWork = atWork)$playerID
   birthYear <- getPlayer(playerName, atWork = atWork)[, birthYear + age_CF]
