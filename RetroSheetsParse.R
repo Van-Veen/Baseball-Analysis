@@ -1,5 +1,6 @@
 library(data.table)
 library(magrittr)
+library(stringr)
 
 # version: omit
 # id: DONE!
@@ -62,6 +63,9 @@ fpw <- "/Users/joelstewart/Desktop/Baseball Analysis/Data/2016eve/2016LAN.EVN"
 #fpw <- "/Users/joelstewart/Desktop/Baseball Analysis/Data/2016eve/2016ARI.EVN"
 #fpw <- "/Users/joelstewart/Desktop/Baseball Analysis/Data/2016eve/2016SFN.EVN"
 tempPath <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/RStemp2.csv"
+
+fpw <- "C:/Users/jstewart/Desktop/Baseball Analysis/Data/2016eve/2016LAN.EVN"
+tempPath <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/RStemp2.csv"
 
 DFm <- readLines(fpw) %>% 
   paste(seq(1, length(.), by = 1), ., sep = ",")
@@ -191,7 +195,8 @@ PLAYS <- fread(tempPath) %>%
 
 DF <- DF[-grep(",play,", DF)]
 
-PITCH <- PLAYS[, c("GameID", "Idx", "Inning", "HomeVisit", "RetroID", "CAP", "Pitches"), with = F]
+PITCH <- PLAYS[, c("GameID", "Idx", "Inning", "HomeVisit", "RetroID", "CAP", "Pitches"), with = F] %>% 
+  .[, PlayID := paste(GameID, Idx, sep = "")]
 PLAYS <- PLAYS[, c("GameID", "Idx", "Inning", "HomeVisit", "RetroID", "Play" )]
 
 
@@ -234,7 +239,40 @@ DEFENSE <- rbind(POS_HOME, POS_AWAY) %>%
 
 # 9. Processing PLAYS::-----------------------------------------------------------------------------------
 
-PLAYS <- PLAYS[, PlayID := paste(GameID, Idx, sep = "")]
+PLAYS <- PLAYS[, PlayID := paste(GameID, Idx, sep = "")] %>% 
+  .[grep("\\.", Play), AdvBase := gsub(".*\\.", "", Play)] %>% 
+  .[, Play := gsub("\\..*", "", Play)] %>% 
+  .[, Play := gsub("L-|L\\+", "L", Play)] %>% 
+  .[, Play := gsub("G-|G\\+", "G", Play)] %>% 
+  .[, Play := gsub("F-|F\\+", "F", Play)] %>% 
+  .[grep("MREV", Play), MREV := 1] %>% 
+  .[, Play := gsub("/MREV", "", Play)] %>%
+  .[grep("UREV", Play), UREV := 1] %>% 
+  .[, Play := gsub("/UREV", "", Play)] %>% 
+  .[MREV == 1 | UREV == 1, RevIdx := Idx + 1] %>% 
+  .[grep("OA", Play), RevIdx := ifelse(is.na(RevIdx), Idx + 1, RevIdx)] %>% 
+  .[, Play := gsub("OA|\\+OA", "", Play)] %>% 
+  .[Play == "K", SO := 1] %>% 
+  .[Play == "K", Outs := 1] %>% 
+  .[Play == "K", Play := ""] %>% 
+  .[Play == "HP", AdvBase := ifelse(is.na(AdvBase), "B-1", paste(AdvBase, "B-1", sep = ";"))] %>% 
+  .[Play == "HP", Play := ""] %>% 
+  .[grep("WP", Play), WP := 1] %>% 
+  .[, Play := gsub("WP|\\+WP", "", Play)] %>% 
+  .[Play == "W", BB := 1] %>% 
+  .[Play == "W", Play := ""] %>% 
+  .[grep("HR", Play), HR := 1] %>% 
+  .[, HitType := NA] %>% 
+  .[HR == 1 & grep()]
+
+
+PLAYS[, table(str_count(Play, "/"))]
+PLAYS[str_count(Play, "/") == 3]
+
+nrow(PLAYS[Play == ""])
+nrow(PLAYS[Play == ""])/nrow(PLAYS) * 100
+
+
 
 # 10. Processing PITCH ::--------------------------------------------------------------------------------
 
@@ -263,34 +301,27 @@ test <- read.table(tempPath, header = F, fill = T, sep = ",", col.names = colNam
   setnames(., "value", "PitchResult")
 
 PITCH_CW <- fread("/Users/joelstewart/Desktop/Baseball Analysis/Data/Helper Files/PitchCW.csv")
+PITCH_CW <- fread("C:/Users/jstewart/Desktop/Baseball Analysis/Data/Helper Files/PitchCW.csv")
 
 test_p <- merge(test, PITCH, by = c("PlayID", "Idx"), all.x = T) %>% 
   merge(., DEFENSE[, c("PlayID", "P1"), with = F], by = "PlayID", all.x = T) %>% 
   .[order(Idx)] %>% 
   setnames(., c("RetroID", "P1"), c("Batter", "Pitcher")) %>% 
   merge(., PITCH_CW, by = "PitchResult", all.x = T) %>% 
-  .[order(Idx, PitchID)]
+  .[order(Idx, PitchID)] %>% 
+  .[, HBP := ifelse(PitchResult == "H", 1, 0)]
 
 PITCH_TYPES_GP <- dcast(test_p[PitchCount == 1], GameID + Pitcher ~ PitchResult )
 PITCH_TYPES_P <- dcast(test_p[PitchCount == 1], Pitcher ~ PitchResult, value.var = "PitchResult",fun.aggregate = length)
-  
+
+
+test_p <- test_p[, lastPitch := substr(Pitches, nchar(Pitches), nchar(Pitches))]
+
+
+
 # 11. Processing BASES ::------------------------------------------------
 
 head(PLAYS)
-
-BASES <- PLAYS[grep("\\.", Play)] %>% 
-  .[, c("PlayID", "Play"), with = F] %>% 
-  .[, AdvBase := gsub(".*\\.", "", Play)] %>% 
-  .[, Play2 := gsub("\\..*", "", Play)] %>% 
-  .[grep("HP", Play), HBP := 1] %>% 
-  .[grep("WP", Play), WP := 1]
-
-ON_BASE <- PLAYS[, c("PlayID", "Play"), with = F] %>% 
-  .[PlayID %in% BASES$PlayID == F] %>% 
-  .[, AdvBase := NA] %>% 
-  .[, Play2 := gsub("\\..*", "", Play)] %>% 
-  .[grep("HP", Play), HBP := 1] %>% 
-  .[, WP := NA]
 
 test <- PLAYS[, c("PlayID", "Play"), with = F] %>%
   .[grep("\\.", Play), AdvBase := gsub(".*\\.", "", Play)] %>% 
@@ -317,10 +348,4 @@ test[grep("/G", Play)] %>% nrow(.) #177
 # 7. Walks : W
 #
 
-PLAYS[grep("C", Play)]
-PLAYS[grep("SF", Play)]
-PLAYS[grep("GTP", Play)]
-PLAYS[grep("/L", Play)][, table(gsub(".*/L", "", Play))]
-PLAYS[grep("K\\+", Play)]
-PLAYS[grep("/DP", Play)]
-PLAYS[grep("FO", Play)]
+
