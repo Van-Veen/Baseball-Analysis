@@ -64,8 +64,8 @@ fpw <- "/Users/joelstewart/Desktop/Baseball Analysis/Data/2016eve/2016LAN.EVN"
 #fpw <- "/Users/joelstewart/Desktop/Baseball Analysis/Data/2016eve/2016SFN.EVN"
 tempPath <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/RStemp2.csv"
 
-#fpw <- "C:/Users/jstewart/Desktop/Baseball Analysis/Data/2016eve/2016LAN.EVN"
-#tempPath <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/RStemp2.csv"
+fpw <- "C:/Users/jstewart/Desktop/Baseball Analysis/Data/2016eve/2016LAN.EVN"
+tempPath <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/RStemp2.csv"
 
 DFm <- readLines(fpw) %>% 
   paste(seq(1, length(.), by = 1), ., sep = ",")
@@ -268,8 +268,11 @@ PLAYS <- PLAYS[, PlayID := paste(GameID, Idx, sep = "")] %>%
   .[HR == 1, HitLocation := gsub("/.*", "", Play)] %>% 
   .[HR == 1, HitType := gsub(".*/", "", Play)] %>% 
   .[HR == 1, Play := ""] %>% 
+  .[grep("/SH", Play), SH := 1] %>% 
+  .[SH == 1, Play := gsub("/SH", "", Play)] %>% 
   #.[grep("/L", Play), HitType := "L"] %>% 
   .[grep("/BG", Play), BG := 1] %>% 
+  .[BG == 1, HitType := "BG"] %>% 
   .[, Play := gsub("/BG", "", Play)] %>% 
   .[Play == "IW", IBB := 1] %>% 
   .[Play == "IW", Play := ""] %>% 
@@ -298,7 +301,13 @@ PLAYS <- PLAYS[, PlayID := paste(GameID, Idx, sep = "")] %>%
   .[Error == 1, HitType := ifelse(str_count(Play, "/G") > 0, "G", HitType)] %>% 
   .[Error == 1, Play := gsub("/G", "", Play)] %>% 
   .[Error == 1, HitType := ifelse(str_count(Play, "/P") > 0, "P", HitType)] %>% 
-  .[Error == 1, Play := gsub("/P", "", Play)]
+  .[Error == 1, Play := gsub("/P", "", Play)] %>% 
+  .[grep("FC", Play), FC := 1] %>% 
+  .[FC == 1, AdvBase := ifelse(str_count(AdvBase, "B-1") == 0, paste(AdvBase, "B-1", sep = ";"), AdvBase)] %>% 
+  .[FC == 1, HitType := ifelse(str_count(Play, "/") != 0, gsub(".*/", "", Play), HitType)] %>% 
+  .[FC == 1, Fielded := gsub("/.*", "", Play)] %>% 
+  .[FC == 1, Fielded := gsub("FC", "", Fielded)] %>% 
+  .[FC == 1, Play := ""]
 
 
 PLAYS[, table(str_count(Play, "/"))]
@@ -336,7 +345,7 @@ test <- read.table(tempPath, header = F, fill = T, sep = ",", col.names = colNam
   setnames(., "value", "PitchResult")
 
 PITCH_CW <- fread("/Users/joelstewart/Desktop/Baseball Analysis/Data/Helper Files/PitchCW.csv")
-#PITCH_CW <- fread("C:/Users/jstewart/Desktop/Baseball Analysis/Data/Helper Files/PitchCW.csv")
+PITCH_CW <- fread("C:/Users/jstewart/Desktop/Baseball Analysis/Data/Helper Files/PitchCW.csv")
 
 test_p <- merge(test, PITCH, by = c("PlayID", "Idx"), all.x = T) %>% 
   merge(., DEFENSE[, c("PlayID", "P1"), with = F], by = "PlayID", all.x = T) %>% 
