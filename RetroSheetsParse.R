@@ -64,8 +64,8 @@ fpw <- "/Users/joelstewart/Desktop/Baseball Analysis/Data/2016eve/2016LAN.EVN"
 #fpw <- "/Users/joelstewart/Desktop/Baseball Analysis/Data/2016eve/2016SFN.EVN"
 tempPath <- "/Users/joelstewart/Desktop/Baseball Analysis/temp_files/RStemp2.csv"
 
-fpw <- "C:/Users/jstewart/Desktop/Baseball Analysis/Data/2016eve/2016LAN.EVN"
-tempPath <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/RStemp2.csv"
+#fpw <- "C:/Users/jstewart/Desktop/Baseball Analysis/Data/2016eve/2016LAN.EVN"
+#tempPath <- "C:/Users/jstewart/Desktop/Baseball Analysis/temp_files/RStemp2.csv"
 
 DFm <- readLines(fpw) %>% 
   paste(seq(1, length(.), by = 1), ., sep = ",")
@@ -239,7 +239,9 @@ DEFENSE <- rbind(POS_HOME, POS_AWAY) %>%
 
 # 9. Processing PLAYS::-----------------------------------------------------------------------------------
 
-PLAYS <- PLAYS[, PlayID := paste(GameID, Idx, sep = "")] %>% 
+PLAYS <- PLAYS[, PlayID := paste(GameID, Idx, sep = "")] %>%
+  .[, origPlay := Play] %>% 
+  .[, origPlay := gsub("\\..*", "", origPlay)] %>% 
   .[grep("\\.", Play), AdvBase := gsub(".*\\.", "", Play)] %>% 
   .[, Play := gsub("\\..*", "", Play)] %>% 
   .[, Play := gsub("L-|L\\+", "L", Play)] %>% 
@@ -262,8 +264,41 @@ PLAYS <- PLAYS[, PlayID := paste(GameID, Idx, sep = "")] %>%
   .[Play == "W", BB := 1] %>% 
   .[Play == "W", Play := ""] %>% 
   .[grep("HR", Play), HR := 1] %>% 
-  .[, HitType := NA] %>% 
-  .[HR == 1 & grep()]
+  .[HR == 1, Play := gsub("HR/", "", Play)] %>% 
+  .[HR == 1, HitLocation := gsub("/.*", "", Play)] %>% 
+  .[HR == 1, HitType := gsub(".*/", "", Play)] %>% 
+  .[HR == 1, Play := ""] %>% 
+  #.[grep("/L", Play), HitType := "L"] %>% 
+  .[grep("/BG", Play), BG := 1] %>% 
+  .[, Play := gsub("/BG", "", Play)] %>% 
+  .[Play == "IW", IBB := 1] %>% 
+  .[Play == "IW", Play := ""] %>% 
+  .[grep("K\\+", Play), Outs := ifelse(is.na(Outs), 1, Outs + 1)] %>% 
+  .[grep("K\\+", Play), SO := 1] %>% 
+  .[, Play := gsub("K\\+", "", Play)] %>% 
+  .[grep("SB", Play), SB := 1] %>% 
+  .[SB == 1, BasesStolen := gsub("SB", "", Play)] %>% 
+  .[grep("SB", Play), Play := ""] %>% 
+  .[grep("FINT", Play), FINT := 1] %>% 
+  .[grep("/FINT", Play), Play := gsub("/FINT", "", Play)] %>% 
+  .[grep("DGR", Play), DGR := 1] %>% 
+  .[grep("DGR", Play), Play := gsub("DGR/", "", Play)] %>% 
+  .[DGR == 1, HitType := gsub(".*/", "", Play)] %>% 
+  .[DGR == 1, HitLocation := gsub("/.*", "", Play)] %>% 
+  .[DGR == 1, Play := ""] %>% 
+  .[grep("DI", Play), DI := 1] %>% 
+  .[DI == 1, Play := ""] %>% 
+  .[substr(Play, 1, 1) == "D", B2 := 1] %>% 
+  .[B2 == 1, Play := gsub("D", "", Play)] %>% 
+  .[B2 == 1, Fielded := gsub("/.*", "", Play)] %>% 
+  .[B2 == 1, HitType := gsub(".*/", "", Play)] %>% 
+  .[B2 == 1, AdvBase := ifelse(is.na(AdvBase), "B-2", paste(AdvBase, "B-2", sep = ";"))] %>% 
+  .[B2 == 1, Play := ""] %>% 
+  .[grep("E", Play), Error := 1] %>% 
+  .[Error == 1, HitType := ifelse(str_count(Play, "/G") > 0, "G", HitType)] %>% 
+  .[Error == 1, Play := gsub("/G", "", Play)] %>% 
+  .[Error == 1, HitType := ifelse(str_count(Play, "/P") > 0, "P", HitType)] %>% 
+  .[Error == 1, Play := gsub("/P", "", Play)]
 
 
 PLAYS[, table(str_count(Play, "/"))]
@@ -283,7 +318,7 @@ test <- PITCH[, PlayID := paste(GameID, Idx, sep = "")] %>%
 mostPitches <- max(nchar(test$Pitches))
 
 test <- test[, Pitches := gsub("", ",", Pitches) %>% substr(., 2, nchar(.) - 1)]
-  
+
 test <- paste(test$PlayID, test$Idx, test$Pitches, sep = ",")
 
 writeLines(test, tempPath)
@@ -301,7 +336,7 @@ test <- read.table(tempPath, header = F, fill = T, sep = ",", col.names = colNam
   setnames(., "value", "PitchResult")
 
 PITCH_CW <- fread("/Users/joelstewart/Desktop/Baseball Analysis/Data/Helper Files/PitchCW.csv")
-PITCH_CW <- fread("C:/Users/jstewart/Desktop/Baseball Analysis/Data/Helper Files/PitchCW.csv")
+#PITCH_CW <- fread("C:/Users/jstewart/Desktop/Baseball Analysis/Data/Helper Files/PitchCW.csv")
 
 test_p <- merge(test, PITCH, by = c("PlayID", "Idx"), all.x = T) %>% 
   merge(., DEFENSE[, c("PlayID", "P1"), with = F], by = "PlayID", all.x = T) %>% 
@@ -347,5 +382,3 @@ test[grep("/G", Play)] %>% nrow(.) #177
 # 6. Stolen Bases: SB
 # 7. Walks : W
 #
-
-
