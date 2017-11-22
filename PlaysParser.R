@@ -1,4 +1,3 @@
-
 # Shelved
 # 1. Credits field needs to be cleaned, removing either "(" or ")" and processed, ideally in a function. Initially, I think putouts and assists will 
 #    be contained in another table, with the key being PlayID
@@ -118,6 +117,7 @@ DF <- DF[Outcome == "K", SO := 1] %>%
 DF[grep("DI", Outcome)]
 
 DF <- DF[grep("DI", Outcome), DI := 1] %>% 
+  .[DI == 1, SB := 1] %>% 
   .[grep("DI", Outcome), Outcome := NA]
 
 
@@ -202,7 +202,7 @@ DF[grep("W", Outcome), table(Outcome)]
 DF <- DF[Outcome == "W", BB := 1] %>% 
   .[Outcome == "W", AdvBase := ifelse(is.na(AdvBase), "B-1", ifelse(str_count(AdvBase, "B") == 0, paste(AdvBase, "B-1", sep = ";"), AdvBase))] %>% 
   .[Outcome == "W", Outcome := NA]
-  
+
 
 # Addressing intentional base on balls ::---------------------------------------------
 # 1. Create indicator for intentional base on balls
@@ -236,7 +236,7 @@ DF <- DF[grep("PO", Outcome), POA := 1] %>%
   .[POA == 1 & is.na(ERR), PO_base := gsub("\\(.*", "", Outcome)] %>%
   .[, -c("POA"), with = F] %>% 
   .[grep("PO", Outcome), Outcome := NA]
-  
+
 
 # Addressing Errors on foul fly balls ::----------------------------------------------------------------------------------
 # 1. Create indicator for error on foul fly balls
@@ -261,12 +261,53 @@ DF[substr(Outcome, 1, 1) == "E", table(Outcome)]
 DF <- DF[substr(Outcome, 1, 1) == "E", ERR := Outcome] %>%
   .[substr(Outcome, 1, 1) == "E", AdvBase := ifelse(is.na(AdvBase), "B-1", ifelse(str_count(AdvBase, "B") == 0, paste(AdvBase, "B-1", sep = ";"), AdvBase))] %>% 
   .[substr(Outcome, 1, 1) == "E", Outcome := NA]
-  
+
+# Addressing situation where the pitcher commits a balk ::------------------------
+# 1. Create an indicator variable for balks
+
+DF[grep("BK", Outcome)]
+
+DF <- DF[grep("BK", Outcome), BK := 1] %>% 
+  .[BK == 1, Outcome := NA]
+
+# Addressing situations where managers request reviews ::-------------------
+# 1. Create indicator for MREV calls
+# 2. Create ComIdx for merging MREV items to COM descriptions
+
+DF[grep("MREV", Mods), table(Mods)]
+DF[grep("MREV", Mods), table(Outcome)]
+
+DF <- DF[grep("MREV", Mods), MREV := 1] %>% 
+  .[MREV == 1, ComIdx := Idx + 1] %>% 
+  .[, Mods := gsub("MREV|/MREV", "", Mods)]
+
+# Addressing situations where umpires review plays ::--------------------------
+# 1. Create an indicator for umpire reviews
+# 2. Modify ComIdx to account for idx lines that may be in the com file
+
+DF[grep("UREV", Mods), table(Mods)]
+DF[grep("UREV", Mods), table(Outcome)]
+
+DF <- DF[grep("UREV", Mods), UREV := 1] %>% 
+  .[UREV == 1, ComIdx := Idx + 1] %>% 
+  .[, Mods := gsub("UREV|/UREV", "", Mods)]
+
+# Addressing Throwing error modifier codes ::------------------------ 
+# 1. Create an indicator for throwing errors 
+
+DF[grep("TH", Mods), table(Mods)]
+
+DF <- DF[grep("TH", Mods), ERR_TH := 1] %>% 
+  .[, Mods := gsub("TH|/TH|TH/", "", Mods)]
+
+# Addressing passed balls ::------------------------
+# 1. Create an indicator for passed balls
+
+DF[grep("PB", Outcome), table(Outcome)]
+
+DF <- DF[grep("PB", Outcome), PB := 1] %>% 
+  .[grep("PB", Outcome), Outcome := NA]
 
 
 DF[, table(is.na(Outcome))]/nrow(DF) * 100
 DF[, table(Outcome)]
-
-
-
-
