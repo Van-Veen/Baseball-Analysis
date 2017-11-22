@@ -5,6 +5,7 @@
 # 3. Need to revist contributions to AdvBase to ensure that explicit basemoves aren't present or usurped
 # 4. Need to summate pick off attempts from pitches data with extant PO data from successfule, or failed, pick off attempts
 # 5. Need to revisit derived metrics to see if they should contribute to Out indicator
+# 6. Cleanup ComIdx. Initially, these are index codes that 'might' be a comment in COM. Crossreference with COM and remove if not mutual code in both tables.
 
 head(PLAYS)
 
@@ -307,6 +308,108 @@ DF[grep("PB", Outcome), table(Outcome)]
 
 DF <- DF[grep("PB", Outcome), PB := 1] %>% 
   .[grep("PB", Outcome), Outcome := NA]
+
+
+# Addressing fielder's choice ::------------------------------------------------------
+
+DF[grep("FC", Outcome)]
+
+DF <- DF[grep("FC", Outcome), FC := 1] %>% 
+  .[FC == 1, Fielded := gsub("FC", "", Outcome)] %>% 
+  .[FC == 1, Outcome := NA]
+
+
+# Creating an indicator for exceptional plays ::--------------------------------------
+
+DF[grep("!", Outcome)]
+
+DF <- DF[grep("!", Outcome), EP := 1] %>% 
+  .[EP == 1, Outcome := gsub("!", "", Outcome)]
+
+# Addressing balls hit and caught by single fielder ::-----------------------------------
+
+DF[Outcome %in% as.character(seq(1, 9))]
+DF[Outcome %in% as.character(seq(1, 9)), table(Outcome)]
+DF[Outcome %in% as.character(seq(1, 9)), table(Mods)]
+
+DF <- DF[Outcome %in% as.character(seq(1, 9)), tempIdx := 1] %>% 
+  .[tempIdx == 1, Out := 1] %>% 
+  .[tempIdx == 1, BIP := 1] %>% 
+  .[tempIdx == 1, Credits := Outcome] %>% 
+  .[tempIdx == 1, Outcome := NA] %>% 
+  .[, -c("tempIdx"), with = F]
+
+
+# Addressing unspecified base movements ::---------------------------------------------
+
+DF[Outcome == "OA"]
+
+DF <- DF[Outcome == "OA", OA := 1] %>% 
+  .[OA == 1, ComIdx := ifelse(is.na(ComIdx), Idx + 1, ComIdx)] %>% 
+  .[OA == 1, Outcome := NA]
+
+# Addressing dropped third strikes ::--------------------------------------------------
+
+DF[Outcome == "K23"]
+
+DF <- DF[Outcome == "K23", K23 := 1] %>% 
+  .[K23 == 1, SO := 1] %>% 
+  .[K23 == 1, AdvBase := ifelse(is.na(AdvBase), "BX1", ifelse(str_count(AdvBase, "B") == 0, paste(AdvBase, "BX1", sep = ";"), AdvBase))] %>% 
+  .[K23 == 1, Credits := gsub("K", "", Outcome)] %>% 
+  .[K23 == 1, Outcome := NA]
+
+# Addressing Catching errors by defensive positions ::-----------------------------------
+
+DF[grep("E", Outcome)]
+
+DF <- DF[grep("E", Outcome), ERR := gsub(".*E", "E", Outcome)] %>% 
+  .[grep("E", Outcome), AdvBase := ifelse(is.na(AdvBase), "B-1", ifelse(str_count(AdvBase, "B") == 0, paste(AdvBase, "B-1", sep = ";"), AdvBase))] %>% 
+  .[grep("E", Outcome), Fielded := gsub("E", "", Outcome)] %>% 
+  .[grep("E", Outcome), Outcome := NA]
+
+
+# Adressing other fielding plays that involve multiple fielders ::---------------------------------
+
+DF[!grep("\\(", Outcome)][!is.na(Outcome), table(Outcome)]
+DF[!grep("\\(", Outcome)][!is.na(Outcome), table(Mods)]
+
+DF <- DF[!grep("\\(", Outcome), tempIdx := 1] %>% 
+  .[tempIdx == 1, tempIdx := ifelse(is.na(Outcome), NA, tempIdx)] %>% 
+  .[tempIdx == 1, Out := 1] %>% 
+  .[tempIdx == 1, Credits := Outcome] %>% 
+  .[tempIdx == 1, BIP := 1] %>%
+  .[tempIdx == 1, Outcome := NA] %>% 
+  .[, -c("tempIdx"), with = F]
+
+
+# Addressing force outs, ground into double plays, and other defensive plays ::-----------------------------------
+
+DF[substr(Outcome, nchar(Outcome), nchar(Outcome)) == ")"]
+DF[substr(Outcome, nchar(Outcome), nchar(Outcome)) == ")", table(Outcome)]
+DF[substr(Outcome, nchar(Outcome), nchar(Outcome)) == ")", table(Mods)]
+DF[substr(Outcome, nchar(Outcome), nchar(Outcome)) == ")" & str_count(Mods, "GDP") != 1, table(Outcome)]
+
+DF <- DF[substr(Outcome, nchar(Outcome), nchar(Outcome)) == ")" & str_count(Mods, "GDP") != 1, tempIdx := 1] %>% 
+  .[tempIdx == 1, Credits := gsub("\\(.*", "", Outcome)] %>% 
+  .[tempIdx == 1, Out := 1] %>% 
+  .[tempIdx == 1, tempBase := gsub(".*\\(|\\)", "", Outcome)] %>% 
+  .[tempIdx == 1, tempBase := ifelse(tempBase != "B", paste(tempBase, as.numeric(tempBase) + 1, sep = "X"), "BX1")] %>% 
+  .[tempIdx == 1, AdvBase := paste(AdvBase, tempBase, sep = ";")] %>% 
+  .[tempIdx == 1, Outcome := NA] %>% 
+  .[, -c("tempIdx", "tempBase"), with = F]
+
+outSelect <- "\\(B\\)|\\(1\\)|\\(2\\)|\\(3\\)"
+outSelect2 <- "[^\\(B\\)|\\(1\\)|\\(2\\)|\\(3\\)]+"
+test <- c("3(B)3(1)", "64(1)3")
+
+gsub(outSelect, "\\*", test)
+gsub(outSelect2, "", test)
+
+
+DF <- DF[!is.na(Outcome) & str_count(Mods, "GDP") != 0, tempIdx := 1] %>% 
+  .
+
+
 
 
 DF[, table(is.na(Outcome))]/nrow(DF) * 100
