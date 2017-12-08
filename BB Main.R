@@ -4,6 +4,7 @@
 library(data.table)
 library(magrittr)
 library(lubridate)
+library(stringr)
 
 
 # Functions ::-----------------------------------
@@ -30,17 +31,78 @@ getPlayer <- function(playerName, atWork = F){
   return(DF)
 }
 
-bbref <- function(playerName){
+bbref <- function(player, dy = NULL){
   
-  ID <- getPlayer(playerName)$bbrefID
-  firstInitial <- substr(ID, 1, 1)
+  # Pulling in the Lahmans Master directory
+  fp <- "C:/Users/jstewart/Desktop/Baseball Analysis/Data/Master.csv"
+  
+  DF <- fread(fp)
+  
+  # Create a queryName that is all caps for standardization
+  # Create an indicator for duplicate names
+  # Create a debut year variable for further filtering of dupes
+  DF <- DF[, queryName := toupper(paste(nameFirst, nameLast, sep = " "))] %>% 
+    .[, DebutYr := year(as.Date(debut))] %>% 
+    .[, c("queryName", "DebutYr", "bbrefID"), with = F] %>% 
+    .[, Dupes := .N, by = queryName] %>% 
+    .[, Dupes := ifelse(Dupes > 1, 1, 0)]
+  
+  # Formatting the function argument for standardization
+  PLAYER <- toupper(player)
+  
+  # Specifying base bbref url for later usage
   baseURL <- "https://www.baseball-reference.com/players/"
   
-  finalURL <- paste(baseURL, firstInitial, "/", ID, ".shtml", sep = "")
+  # Producing an error for erroneous query
+  if(PLAYER %in% DF$queryName == F){return(warning("ERROR: Player not found in database."))}
   
-  browseURL(finalURL)
+  # Given the player is in the database, we parse down the master directory to players matching the argument parameter
+  selectedPlayer <- DF[queryName == PLAYER]
+  
+  # Checking for dupes
+  if(max(selectedPlayer$Dupes) == 1){
+    
+    # If debut year is not specified on a dupe, we return an error message and provide debut years for each dupe
+    if(is.null(dy)){
+      
+      debutYears <- paste(selectedPlayer$DebutYr, collapse = ", ")
+      
+      message <- cat(paste("There are multiple players named ", str_to_title(PLAYER), " with the following debut years: ", debutYears, "\n", 
+                           "Please specify which debut year as a secondary function argument to query appropriate player.", sep = "" ))
+      
+      return(message)
+    
+      # If debut year is specified, we navagate to that player's info and open up their bbref page  
+    }else{
+      
+      selectedPlayer <- selectedPlayer[DebutYr == dy]
+      
+      firstLetter <- gsub(".* ", "", PLAYER) %>% substr(., 1, 1) %>% tolower(.)
+      
+      id <- selectedPlayer$bbrefID
+      
+      selectedURL <- paste(baseURL, firstLetter, "/", id, ".shtml", sep = "")
+      
+      browseURL(selectedURL)
+      
+    }
+    
+   # given no duplicate player names, we can simply create the bbref url and open up that player's personal page 
+  }else{
+    
+    firstLetter <- gsub(".* ", "", PLAYER) %>% substr(., 1, 1) %>% tolower(.)
+    
+    id <- selectedPlayer$bbrefID
+    
+    selectedURL <- paste(baseURL, firstLetter, "/", id, ".shtml", sep = "")
+    
+    browseURL(selectedURL)
+    
+  }
+  
   
 }
+
 
 batting <- function(playerName, atWork = F){
   player <- getPlayer(playerName, atWork = atWork)$playerID
