@@ -1,5 +1,4 @@
 
-
 # packages ::-----------------------------------
 library(data.table)
 library(magrittr)
@@ -71,7 +70,7 @@ bbref <- function(player, dy = NULL){
                            "Please specify which debut year as a secondary function argument to query appropriate player.", sep = "" ))
       
       return(message)
-    
+      
       # If debut year is specified, we navagate to that player's info and open up their bbref page  
     }else{
       
@@ -87,7 +86,7 @@ bbref <- function(player, dy = NULL){
       
     }
     
-   # given no duplicate player names, we can simply create the bbref url and open up that player's personal page 
+    # given no duplicate player names, we can simply create the bbref url and open up that player's personal page 
   }else{
     
     firstLetter <- gsub(".* ", "", PLAYER) %>% substr(., 1, 1) %>% tolower(.)
@@ -144,7 +143,7 @@ advBatting <- function(playerName, atWork = F){
           "OBP", "SLG", "OPS", "ISO", "BABIP"), with = F]
   
   return(DF)
-    
+  
 }
 
 IDCW <- function(atWork = T){
@@ -166,6 +165,17 @@ IDCW <- function(atWork = T){
     .[, c("playerID", "retroID", "bbrefID", "fullName", "teamID", "recentYear"), with = F] 
   
   return(t1)
+  
+}
+
+OPS_scores <- function(){
+  
+  Category <- LETTERS[1:7]
+  Classification <- c("Great", "Very Good", "Above Average", "Average", "Below Average", "Poor", "Very Poor")
+  OBP_min <- c(.9000, .8333, .7667, .7000, .6334, .5667, .0001)
+  OBP_max <- c(5.0000, .8999, .8332, .7666, .6999, .6333, .5666)
+  
+  ScoreCW <- data.table(Category, Classification, OBP_min, OBP_max)
   
 }
 
