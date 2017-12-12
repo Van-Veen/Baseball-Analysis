@@ -168,7 +168,7 @@ IDCW <- function(atWork = T){
   
 }
 
-OBPscores <- function(){
+OPS_scores <- function(){
   
   Category <- LETTERS[1:7]
   Classification <- c("Great", "Very Good", "Above Average", "Average", "Below Average", "Poor", "Very Poor")
@@ -178,3 +178,4 @@ OBPscores <- function(){
   ScoreCW <- data.table(Category, Classification, OBP_min, OBP_max)
   
 }
+
